@@ -16,7 +16,7 @@ Key behavior (kept as in the working script):
 from __future__ import annotations
 from typing import Dict
 import pandas as pd
-from common import setup_logging
+from common import setup_logging, data_year
 
 logger = setup_logging()
 
@@ -118,21 +118,34 @@ def build_demand_and_capacity_industry(
         demand_com_list = [f"D_{s}" for s in sector_list]
 
     # ---- GDP scaling dict from CER CEF GNZ ----
+    # Build cumulative growth factors from the NRCan baseline year to each
+    # period's data year (end-of-period convention: data_year = period + 5).
+    nrcan_year: int = 2022  # must match the NRCan baseline used in base_2022
+    end_years = [data_year(p, periods) for p in periods]
+    all_gdp_years = sorted(set([nrcan_year]) | set(end_years))
+
     gdp_df = pop_df.copy()
-    gdp_df = gdp_df[gdp_df['Year'].isin(periods)]
+    gdp_df = gdp_df[gdp_df['Year'].isin(all_gdp_years)]
     gdp_df = gdp_df[gdp_df['Variable'] == 'Real Gross Domestic Product ($2012 Millions)']
     gdp_df = gdp_df[gdp_df['Scenario'] == 'Global Net-zero']
     gdp_df = gdp_df.sort_values('Year').reset_index(drop=True)
 
+    # gdp_dict[y] = GDP(y) / GDP(nrcan_year): cumulative growth from the NRCan base year
+    gdp_base_rows = gdp_df[gdp_df['Year'] == nrcan_year]
+    if gdp_base_rows.empty:
+        logger.warning(
+            "GDP data missing for NRCan base year %d; all scale factors will default to 1.0",
+            nrcan_year,
+        )
+        gdp_base_val = None
+    else:
+        gdp_base_val = float(gdp_base_rows.iloc[0]['Value'])
+
     gdp_dict: dict[int, float] = {}
-    for i, row in gdp_df.iterrows():
+    for _, row in gdp_df.iterrows():
         year = int(row['Year'])
         val = float(row['Value'])
-        if i == 0:
-            gdp_dict[year] = 1.0
-        else:
-            prev_val = float(gdp_df.loc[i - 1, 'Value'])
-            gdp_dict[year] = (val / prev_val) if prev_val != 0 else 1.0
+        gdp_dict[year] = (val / gdp_base_val) if gdp_base_val else 1.0
 
     # ---- Pull baseline (2022) demand by province for each demand commodity ----
     # The indices 2..11 correspond to the demand_com_list order in the original script.
@@ -161,45 +174,38 @@ def build_demand_and_capacity_industry(
     dem_rows: list[list] = []
     for pro in province_list:
         for year in periods:
+            dy = data_year(year, periods)
+            # Growth factor from the start of this period to its end (data year)
+            scale = float(gdp_dict.get(dy, 1.0))
+
             for dem in demand_com_list:
                 notes = ''
                 ref = ''
                 val: float | None = None
 
-                if year == 2025:
-                    # Latest actual (baseline) from NRCan CEUD (kept as in working script)
-                    notes = 'Value is taken from NRCan Comprehensive Energy Database, the latest value available'
-                    ref = '[I1]'
-
-                    if pro in ('AB', 'ON', 'BC', 'QC', 'MB', 'SK'):
-                        val = base_2022[pro].get(dem)
-                    elif pro in atl_pro:
-                        temp_val = base_2022['ATL'].get(dem)
-                        if temp_val in (None, 0.0):
-                            continue
-                        split_val = _apply_atl_split(temp_val, dem, pro, atl_shares, dem_to_sec)
-                        if split_val is None or split_val == 0.0:
-                            continue
-                        ref = '[I3]'
-                        val = split_val
-                else:
-                    # GDP scaling factor from CER CEF GNZ
-                    notes = 'A scaling factor derived from the GDP growth from CER CEF report'
-                    ref = '[I2]'
-                    scale = float(gdp_dict.get(year, 1.0))
-
-                    if pro in ('AB', 'ON', 'BC', 'QC', 'MB', 'SK'):
-                        base = base_2022[pro].get(dem)
-                        val = None if base is None else float(base) * scale
-                    elif pro in atl_pro:
-                        temp_val = base_2022['ATL'].get(dem)
-                        if temp_val in (None, 0.0):
-                            continue
-                        split_val = _apply_atl_split(temp_val, dem, pro, atl_shares, dem_to_sec)
-                        if split_val is None or split_val == 0.0:
-                            continue
-                        ref = '[I4]'
-                        val = float(split_val) * scale
+                if pro in ('AB', 'ON', 'BC', 'QC', 'MB', 'SK'):
+                    base = base_2022[pro].get(dem)
+                    if base is None:
+                        continue
+                    val = float(base) * scale
+                    notes = (
+                        f'GDP-scaled from NRCan 2022 baseline to data year {dy} '
+                        'using CER CEF Global Net-zero GDP growth'
+                    )
+                    ref = 'I2'
+                elif pro in atl_pro:
+                    temp_val = base_2022['ATL'].get(dem)
+                    if temp_val in (None, 0.0):
+                        continue
+                    split_val = _apply_atl_split(temp_val, dem, pro, atl_shares, dem_to_sec)
+                    if split_val is None or split_val == 0.0:
+                        continue
+                    val = float(split_val) * scale
+                    notes = (
+                        f'GDP-scaled from NRCan 2022 ATL baseline to data year {dy} '
+                        'using CER CEF Global Net-zero GDP growth and StatCan regional shares'
+                    )
+                    ref = 'I4'
 
                 # Skip rows with no value
                 if val in (None, ''):
@@ -252,7 +258,7 @@ def build_demand_and_capacity_industry(
     #         if val == '0':
     #             val = 0.0
 
-    #         ref = '[I1]' if pro not in atl_pro else '[I1][I3]'
+    #         ref = 'I1' if pro not in atl_pro else 'I1I3'
     #         notes = 'Existing capacity is taken from the NRCan comprehensive energy database, the previous value before demand'
 
     #         cap_rows.append([

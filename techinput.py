@@ -7,7 +7,7 @@ Created on Fri Aug 15 14:12:38 2025
 from __future__ import annotations
 import pandas as pd
 from typing import Dict
-from common import setup_logging
+from common import setup_logging, data_year
 
 logger = setup_logging()
 
@@ -106,10 +106,11 @@ def build_limit_tech_input_split_industry(
                         'ge',
                         final_val,
                         (
-                            'Calculated from NRCan comprehensive database. If values were n.a., '
+                            f'Calculated from NRCan 2022 comprehensive database (data year '
+                            f'{data_year(per, periods)}). If values were n.a., '
                             'the remainder to 100% is evenly distributed.'
                         ),
-                        '[I1]',
+                        'I1',
                         2, 1, 2, 3, 3,
                         ids[region],
                     ])

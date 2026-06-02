@@ -47,3 +47,17 @@ def project_paths() -> dict[str, Path]:
         "cache": root / "cache",
         "schema": root / "schema",
     }
+
+
+def data_year(period_or_vintage: int, model_periods: list[int]) -> int:
+    """Return the representative data year for a model period/vintage.
+
+    End-of-period convention: each model period uses data from the end of that
+    period, i.e. period + 5 years (uniform 5-year step).
+
+    Pre-existing vintages (before the first model period) use same-year data.
+    """
+    if period_or_vintage < model_periods[0]:
+        return period_or_vintage
+    else:
+        return period_or_vintage + 5

@@ -7,7 +7,7 @@ Created on Fri Aug 15 16:02:06 2025
 from __future__ import annotations
 import pandas as pd
 from typing import Dict
-from common import setup_logging
+from common import setup_logging, data_year
 import numpy as np
 
 logger = setup_logging()
@@ -23,6 +23,7 @@ def _to_output_comm(tech: str) -> str | None:
 
 def build_efficiency_industry(comb_dict: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     inp = comb_dict['LimitTechInputSplitAnnual'][['region', 'input_comm', 'tech', 'period', 'data_id']].copy()
+    model_periods: list[int] = comb_dict['__domain__']['periods']
 
     eff_df = comb_dict['Efficiency'].copy()
     if eff_df.empty:
@@ -37,8 +38,13 @@ def build_efficiency_industry(comb_dict: Dict[str, pd.DataFrame]) -> Dict[str, p
             'vintage': inp['period'],
             'output_comm': inp['tech'].apply(_to_output_comm),
             'efficiency': 1.0,
-            'notes': 'All technologies are assumed to have arbitrary efficiency; included commodities from NRCan Comp DB',
-            'data_source': '[I1]',
+            'notes': inp['period'].apply(
+                lambda p: (
+                    f'All technologies are assumed to have arbitrary efficiency; '
+                    f'included commodities from NRCan Comp DB (data year {data_year(p, model_periods)})'
+                )
+            ),
+            'data_source': 'I1',
             'data_id': inp['data_id'],
             'dq_cred': np.nan, 'dq_geog': np.nan, 'dq_struc': np.nan, 'dq_tech': np.nan, 'dq_time': np.nan,
         })

@@ -40,9 +40,9 @@ class Config:
 
 def schema_file_for(cfg: Config) -> Path:
     paths = project_paths()
-    if cfg.schema_version != 31:
-        return paths["schema"] / f"schema_{cfg.schema_version}.sql"
-    return paths["schema"] / "schema_3_1.sql"
+    # if cfg.schema_version != 31:
+    #     return paths["schema"] / f"schema_{cfg.schema_version}.sql"
+    return paths["schema"] / "canoe_dataset_schema.sql"
 
 
 def prepare_database(db_path: Path, schema_sql: str) -> list[str]:
@@ -85,8 +85,8 @@ def load_runtime_industry(temp_db_name: str = "CAN_industry.sqlite") -> tuple[Pa
     atl_pro = ['PEI', 'NB', 'NS', 'NLLAB']
 
     # Build IDs
-    id_dict: dict[str, str] = {p: f"GENINDHR{p}{cfg.version}" for p in province_list}
-    id_dict['CAN'] = f"GENINDHR{cfg.version}"
+    id_dict: dict[str, str] = {p: f"INDHR{p}{cfg.version}" for p in province_list}
+    id_dict['CAN'] = f"INDHR{cfg.version}"
 
     db_path = paths["outputs"] / temp_db_name
     schema_sql = schema_file_for(cfg).read_text(encoding="utf-8")
