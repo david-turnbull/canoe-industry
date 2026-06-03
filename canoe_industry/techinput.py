@@ -7,7 +7,7 @@ Created on Fri Aug 15 14:12:38 2025
 from __future__ import annotations
 import pandas as pd
 from typing import Dict
-from common import setup_logging, data_year
+from canoe_industry.common import setup_logging, data_year
 
 logger = setup_logging()
 

@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Dict
 import pandas as pd
 
-from common import setup_logging, load_yaml, ensure_dir, project_paths
+from canoe_industry.common import setup_logging, load_yaml, ensure_dir, project_paths
 
 logger = setup_logging()
 

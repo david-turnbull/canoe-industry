@@ -16,7 +16,7 @@ Key behavior (kept as in the working script):
 from __future__ import annotations
 from typing import Dict
 import pandas as pd
-from common import setup_logging, data_year
+from canoe_industry.common import setup_logging, data_year
 
 logger = setup_logging()
 

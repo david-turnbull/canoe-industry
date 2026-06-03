@@ -8,7 +8,7 @@ Created on Fri Aug 15 12:33:38 2025
 from __future__ import annotations
 import pandas as pd
 from typing import Dict
-from common import setup_logging
+from canoe_industry.common import setup_logging
 import numpy as np
 
 logger = setup_logging()

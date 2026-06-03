@@ -6,7 +6,7 @@ import zipfile
 import io
 import pandas as pd
 
-from common import setup_logging, ensure_dir
+from canoe_industry.common import setup_logging, ensure_dir
 
 logger = setup_logging()
 STATCAN_URL = 'https://www150.statcan.gc.ca/n1/tbl/csv/25100029-eng.zip'

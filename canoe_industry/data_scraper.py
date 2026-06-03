@@ -12,7 +12,7 @@ from typing import Dict
 import requests
 import pandas as pd
 
-from common import setup_logging, ensure_dir
+from canoe_industry.common import setup_logging, ensure_dir
 
 logger = setup_logging()
 
