@@ -8,7 +8,7 @@ from __future__ import annotations
 import pandas as pd
 from typing import Dict
 from canoe_industry.common import setup_logging, data_year
-import numpy as np
+from canoe_schema.v3_2.models import Efficiency
 
 logger = setup_logging()
 
@@ -25,31 +25,29 @@ def build_efficiency_industry(comb_dict: Dict[str, pd.DataFrame]) -> Dict[str, p
     inp = comb_dict['LimitTechInputSplitAnnual'][['region', 'input_comm', 'tech', 'period', 'data_id']].copy()
     model_periods: list[int] = comb_dict['__domain__']['periods']
 
-    eff_df = comb_dict['Efficiency'].copy()
-    if eff_df.empty:
-        eff_df = pd.DataFrame(columns=comb_dict['Efficiency'].columns)
+    rows: list[Efficiency] = []
+    for _, rec in inp.iterrows():
+        rows.append(
+            Efficiency(
+                region=rec['region'],
+                input_comm=rec['input_comm'],
+                tech=rec['tech'],
+                vintage=int(rec['period']),
+                output_comm=_to_output_comm(rec['tech']),
+                efficiency=1.0,
+                notes=(
+                    'All technologies are assumed to have arbitrary efficiency; '
+                    f"included commodities from NRCan Comp DB (data year {data_year(int(rec['period']), model_periods)})"
+                ),
+                data_source='I1',
+                data_id=rec['data_id'],
+            )
+        )
 
-    eff_df = pd.concat([
-        eff_df,
-        pd.DataFrame({
-            'region': inp['region'],
-            'input_comm': inp['input_comm'],
-            'tech': inp['tech'],
-            'vintage': inp['period'],
-            'output_comm': inp['tech'].apply(_to_output_comm),
-            'efficiency': 1.0,
-            'notes': inp['period'].apply(
-                lambda p: (
-                    f'All technologies are assumed to have arbitrary efficiency; '
-                    f'included commodities from NRCan Comp DB (data year {data_year(p, model_periods)})'
-                )
-            ),
-            'data_source': 'I1',
-            'data_id': inp['data_id'],
-            'dq_cred': np.nan, 'dq_geog': np.nan, 'dq_struc': np.nan, 'dq_tech': np.nan, 'dq_time': np.nan,
-        })
-    ], ignore_index=True)
-
-    comb_dict['Efficiency'] = eff_df
-    logger.info("Efficiency rows: %d", len(eff_df))
+    eff_df = pd.DataFrame(
+        [row.model_dump(mode='python') for row in rows],
+        columns=comb_dict['Efficiency'].columns,
+    )
+    comb_dict['Efficiency'] = pd.concat([comb_dict['Efficiency'], eff_df], ignore_index=True)
+    logger.info("Efficiency rows: %d", len(rows))
     return comb_dict

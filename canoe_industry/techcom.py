@@ -8,7 +8,7 @@ from __future__ import annotations
 import pandas as pd
 from typing import Dict
 from canoe_industry.common import setup_logging
-import numpy as np
+from canoe_schema.v3_2.models import Commodity, Technology
 
 logger = setup_logging()
 
@@ -24,17 +24,29 @@ def build_technology_and_commodity_industry(comb_dict: Dict[str, pd.DataFrame]) 
     commodity_list_ex = dom["commodity_list_ex"]
 
     # Technology
-    tech_rows = []
+    tech_rows: list[Technology] = []
     for i, sec in enumerate(sector_list):
-        tech_rows.append([
-            sector_abv + sec,
-            "p",
-            "industrial",
-            np.nan, np.nan, 1, 1, 0, 0, 0, 0, 0, 0,
-            f"Generic technology representing {sector_list_ex[i]} industry",
-            ids['CAN'],
-        ])
-    tech_df = pd.DataFrame(tech_rows, columns=comb_dict["Technology"].columns)
+        tech_rows.append(
+            Technology(
+                tech=sector_abv + sec,
+                flag="p",
+                sector="industrial",
+                unlim_cap=1,
+                annual=1,
+                reserve=0,
+                curtail=0,
+                retire=0,
+                flex=0,
+                exchange=0,
+                seas_stor=0,
+                description=f"Generic technology representing {sector_list_ex[i]} industry",
+                data_id=ids['CAN'],
+            )
+        )
+    tech_df = pd.DataFrame(
+        [row.model_dump(mode="python") for row in tech_rows],
+        columns=comb_dict["Technology"].columns,
+    )
     comb_dict["Technology"] = pd.concat([comb_dict["Technology"], tech_df], ignore_index=True)
 
     # Commodity (+ demand commodities)
@@ -42,7 +54,7 @@ def build_technology_and_commodity_industry(comb_dict: Dict[str, pd.DataFrame]) 
     com_list = commodity_list + demand_com_list
     desc_list = commodity_list_ex + sector_list_ex
 
-    comm_rows = []
+    comm_rows: list[Commodity] = []
     for i, com in enumerate(com_list):
         code = sector_abv + com.lower()
         if code.startswith(sector_abv + "d_"):
@@ -51,9 +63,19 @@ def build_technology_and_commodity_industry(comb_dict: Dict[str, pd.DataFrame]) 
         else:
             flag = "a"
             desc = f"Represents {desc_list[i]} in the industrial sector"
-        comm_rows.append([code, flag, desc, ids['CAN']])
+        comm_rows.append(
+            Commodity(
+                name=code,
+                flag=flag,
+                description=desc,
+                data_id=ids['CAN'],
+            )
+        )
 
-    comm_df = pd.DataFrame(comm_rows, columns=comb_dict["Commodity"].columns)
+    comm_df = pd.DataFrame(
+        [row.model_dump(mode="python") for row in comm_rows],
+        columns=comb_dict["Commodity"].columns,
+    )
     comb_dict["Commodity"] = pd.concat([comb_dict["Commodity"], comm_df], ignore_index=True)
 
     comb_dict["__demand_com_list__"] = demand_com_list

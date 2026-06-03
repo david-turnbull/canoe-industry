@@ -8,7 +8,16 @@ from __future__ import annotations
 from typing import Dict
 import pandas as pd
 from canoe_industry.common import setup_logging
-import numpy as np 
+from canoe_schema.v3_2.models import (
+    DataSet,
+    DataSource,
+    Region,
+    SeasonLabel,
+    TimeOfDay,
+    TimePeriod,
+    TimeSeason,
+    TimeSegmentFraction,
+)
 
 logger = setup_logging()
 
@@ -20,31 +29,49 @@ def add_datasets_and_sources_industry(comb_dict: Dict[str, pd.DataFrame]) -> Dic
     province_list = dom['province_list']
     version = comb_dict['__version__']
 
-    ds_rows = []
+    ds_rows: list[DataSet] = []
     for pro in province_list:
-        ds_rows.append([
-            ids[pro], f"{pro} - industry - high resolution", f"v{version}",
-            "2025 annual update", "active",
-            "David Turnbull - david.turnbull1@ucalgary.ca", "2025-08-01", np.nan,
-            "Original sector design", np.nan,
-        ])
-    ds_rows.append([
-        ids['CAN'], f"industry - high resolution", f"v{version}",
-        "2025 annual update", "active",
-        "David Turnbull - david.turnbull1@ucalgary.ca", "2025-08-01", np.nan,
-        "Original sector design", np.nan,
-    ])
+        ds_rows.append(
+            DataSet(
+                data_id=ids[pro],
+                label=f"{pro} - industry - high resolution",
+                version=f"v{version}",
+                description="2025 annual update",
+                status="active",
+                author="David Turnbull - david.turnbull1@ucalgary.ca",
+                date="2025-08-01",
+                changelog="Original sector design",
+            )
+        )
+    ds_rows.append(
+        DataSet(
+            data_id=ids['CAN'],
+            label="industry - high resolution",
+            version=f"v{version}",
+            description="2025 annual update",
+            status="active",
+            author="David Turnbull - david.turnbull1@ucalgary.ca",
+            date="2025-08-01",
+            changelog="Original sector design",
+        )
+    )
 
-    ds_df = pd.DataFrame(ds_rows, columns=comb_dict['DataSet'].columns)
+    ds_df = pd.DataFrame(
+        [row.model_dump(mode='python') for row in ds_rows],
+        columns=comb_dict['DataSet'].columns,
+    )
     comb_dict['DataSet'] = pd.concat([comb_dict['DataSet'], ds_df], ignore_index=True)
 
-    src_rows = [
-        ['I1', 'NRCan Comprehensive Database, https://oee.nrcan.gc.ca/corporate/statistics/neud/dpa/menus/trends/comprehensive_tables/list.cfm', 'Used the appropriate tables for each sector and province', ids['CAN']],
-        ['I2', 'NRCan Comprehensive Database, https://oee.nrcan.gc.ca/corporate/statistics/neud/dpa/menus/trends/comprehensive_tables/list.cfm; CER Canada Energy Futures report, https://apps.cer-rec.gc.ca/ftrppndc/dflt.aspx?GoCTemplateCulture=en-CA', 'Global net zero macro-economic indicators', ids['CAN']],
-        ['I3', 'NRCan Comprehensive Database, https://oee.nrcan.gc.ca/corporate/statistics/neud/dpa/menus/trends/comprehensive_tables/list.cfm; Statistics Canada 25-10-0029-01, https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=2510002901', 'ATL presence shares for sectoral allocation', ids['CAN']],
-        ['I4', 'NRCan Comprehensive Database, https://oee.nrcan.gc.ca/corporate/statistics/neud/dpa/menus/trends/comprehensive_tables/list.cfm; CER Canada Energy Futures report, https://apps.cer-rec.gc.ca/ftrppndc/dflt.aspx?GoCTemplateCulture=en-CA;  Statistics Canada 25-10-0029-01, https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=2510002901', 'Combined reference that uses GDP growth, statcan distribution and NRCan original demands to predict atlantic province demands',ids['CAN']]
+    src_rows: list[DataSource] = [
+        DataSource(source_id='I1', source='NRCan Comprehensive Database, https://oee.nrcan.gc.ca/corporate/statistics/neud/dpa/menus/trends/comprehensive_tables/list.cfm', notes='Used the appropriate tables for each sector and province', data_id=ids['CAN']),
+        DataSource(source_id='I2', source='NRCan Comprehensive Database, https://oee.nrcan.gc.ca/corporate/statistics/neud/dpa/menus/trends/comprehensive_tables/list.cfm; CER Canada Energy Futures report, https://apps.cer-rec.gc.ca/ftrppndc/dflt.aspx?GoCTemplateCulture=en-CA', notes='Global net zero macro-economic indicators', data_id=ids['CAN']),
+        DataSource(source_id='I3', source='NRCan Comprehensive Database, https://oee.nrcan.gc.ca/corporate/statistics/neud/dpa/menus/trends/comprehensive_tables/list.cfm; Statistics Canada 25-10-0029-01, https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=2510002901', notes='ATL presence shares for sectoral allocation', data_id=ids['CAN']),
+        DataSource(source_id='I4', source='NRCan Comprehensive Database, https://oee.nrcan.gc.ca/corporate/statistics/neud/dpa/menus/trends/comprehensive_tables/list.cfm; CER Canada Energy Futures report, https://apps.cer-rec.gc.ca/ftrppndc/dflt.aspx?GoCTemplateCulture=en-CA;  Statistics Canada 25-10-0029-01, https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=2510002901', notes='Combined reference that uses GDP growth, statcan distribution and NRCan original demands to predict atlantic province demands', data_id=ids['CAN'])
     ]
-    src_df = pd.DataFrame(src_rows, columns=comb_dict['DataSource'].columns)
+    src_df = pd.DataFrame(
+        [row.model_dump(mode='python') for row in src_rows],
+        columns=comb_dict['DataSource'].columns,
+    )
     comb_dict['DataSource'] = pd.concat([comb_dict['DataSource'], src_df], ignore_index=True)
 
     logger.info("Post-processing: %d DataSet, %d DataSource", len(ds_rows), len(src_rows))
@@ -71,46 +98,46 @@ def add_time_ind(comb_dict: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
         else:
             time_season.append('D'+str(x))
         x+=1
-    tod = []
+    tod: list[TimeOfDay] = []
     x=0
     for day in time_of_day:
-        tod.append([x,day])
+        tod.append(TimeOfDay(sequence=x, tod=day))
         x+=1
-    tp = []
+    tp: list[TimePeriod] = []
     x=0
     for period in periods:
-        tp.append([x, period, 'f'])
+        tp.append(TimePeriod(sequence=x, period=period, flag='f'))
         x+=1
-    tp.append([x,2050, 'f'])
-    ts = []
+    tp.append(TimePeriod(sequence=x, period=2050, flag='f'))
+    ts: list[TimeSeason] = []
     for period in periods:
         x=0
         for season in time_season:
-            ts.append([period, x, season, ''])
+            ts.append(TimeSeason(period=period, sequence=x, season=season, notes=''))
             x+=1
-    sl = []
+    sl: list[SeasonLabel] = []
     for season in time_season:
-        sl.append([season, ''])
-    tsf = []
+        sl.append(SeasonLabel(season=season, notes=''))
+    tsf: list[TimeSegmentFraction] = []
     for period in periods:
         for season in time_season:
             for day in time_of_day:
                 val = float(1/8760)
-                tsf.append([period, season, day, val,''])
-    reg = []
+                tsf.append(TimeSegmentFraction(period=period, season=season, tod=day, segfrac=val, notes=''))
+    reg: list[Region] = []
     for region in province_list:
-        reg.append([region, ''])
-    tod_df = pd.DataFrame(tod, columns=comb_dict['TimeOfDay'].columns)
+        reg.append(Region(region=region, notes=''))
+    tod_df = pd.DataFrame([row.model_dump(mode='python') for row in tod], columns=comb_dict['TimeOfDay'].columns)
     comb_dict['TimeOfDay']= pd.concat([comb_dict['TimeOfDay'], tod_df], ignore_index=True)
-    tp_df = pd.DataFrame(tp, columns =comb_dict['TimePeriod'].columns )
+    tp_df = pd.DataFrame([row.model_dump(mode='python') for row in tp], columns =comb_dict['TimePeriod'].columns )
     comb_dict['TimePeriod']= pd.concat([comb_dict['TimePeriod'], tp_df], ignore_index=True)
-    ts_df = pd.DataFrame(ts, columns =comb_dict['TimeSeason'].columns )
+    ts_df = pd.DataFrame([row.model_dump(mode='python') for row in ts], columns =comb_dict['TimeSeason'].columns )
     comb_dict['TimeSeason']= pd.concat([comb_dict['TimeSeason'], ts_df], ignore_index=True)
-    sl_df = pd.DataFrame(sl, columns =comb_dict['SeasonLabel'].columns )
+    sl_df = pd.DataFrame([row.model_dump(mode='python') for row in sl], columns =comb_dict['SeasonLabel'].columns )
     comb_dict['SeasonLabel']= pd.concat([comb_dict['SeasonLabel'], sl_df], ignore_index=True)
-    tsf_df =  pd.DataFrame(tsf, columns =comb_dict['TimeSegmentFraction'].columns )
+    tsf_df =  pd.DataFrame([row.model_dump(mode='python') for row in tsf], columns =comb_dict['TimeSegmentFraction'].columns )
     comb_dict['TimeSegmentFraction']= pd.concat([comb_dict['TimeSegmentFraction'], tsf_df], ignore_index=True)
-    reg_df =  pd.DataFrame(reg, columns =comb_dict['Region'].columns )
+    reg_df =  pd.DataFrame([row.model_dump(mode='python') for row in reg], columns =comb_dict['Region'].columns )
     comb_dict['Region']= pd.concat([comb_dict['Region'], reg_df], ignore_index=True)
     return comb_dict
 

@@ -17,6 +17,7 @@ from __future__ import annotations
 from typing import Dict
 import pandas as pd
 from canoe_industry.common import setup_logging, data_year
+from canoe_schema.v3_2.models import Demand
 
 logger = setup_logging()
 
@@ -168,10 +169,10 @@ def build_demand_and_capacity_industry(
 
     # Demand baseline (NRCan 2022), ExistingCapacity baseline (NRCan 2021)
     base_2022 = _baseline_dict_for_year('2022')
-    base_2021 = _baseline_dict_for_year('2021')
+    _ = _baseline_dict_for_year('2021')
 
     # ---- Build Demand rows across model periods ----
-    dem_rows: list[list] = []
+    dem_rows: list[Demand] = []
     for pro in province_list:
         for year in periods:
             dy = data_year(year, periods)
@@ -213,20 +214,29 @@ def build_demand_and_capacity_industry(
                 if val == '0':
                     val = 0.0
 
-                dem_rows.append([
-                    pro,
-                    int(year),
-                    sector_abv + dem.lower(),
-                    float(val),
-                    'PJ',
-                    notes,
-                    ref,
-                    1, 1, 2, 3, 2,
-                    ids[pro]
-                ])
+                dem_rows.append(
+                    Demand(
+                        region=pro,
+                        period=int(year),
+                        commodity=sector_abv + dem.lower(),
+                        demand=float(val),
+                        units='PJ',
+                        notes=notes,
+                        data_source=ref,
+                        dq_cred=1,
+                        dq_geog=1,
+                        dq_struc=2,
+                        dq_tech=3,
+                        dq_time=2,
+                        data_id=ids[pro],
+                    )
+                )
 
     if dem_rows:
-        dem_df = pd.DataFrame(dem_rows, columns=comb_dict['Demand'].columns)
+        dem_df = pd.DataFrame(
+            [row.model_dump(mode='python') for row in dem_rows],
+            columns=comb_dict['Demand'].columns,
+        )
         comb_dict['Demand'] = pd.concat([comb_dict['Demand'], dem_df], ignore_index=True)
         logger.info("Demand rows appended: %d", len(dem_rows))
     else:
