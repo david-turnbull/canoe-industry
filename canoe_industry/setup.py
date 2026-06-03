@@ -9,7 +9,7 @@ import sqlite3
 from pathlib import Path
 from typing import Dict
 import pandas as pd
-
+from canoe_schema.sql import get_sql_schema
 from canoe_industry.common import setup_logging, load_yaml, ensure_dir, project_paths
 
 logger = setup_logging()
@@ -21,8 +21,8 @@ class Config:
 
     @property
     def schema_version(self) -> int:
-        v = self.params.get("schema_version", [31])[0]
-        return int(v)
+        v = self.params.get("schema_version", "3.2")
+        return str(v)
 
     @property
     def version(self) -> str:
@@ -89,7 +89,8 @@ def load_runtime_industry(temp_db_name: str = "CAN_industry.sqlite") -> tuple[Pa
     id_dict['CAN'] = f"INDHR{cfg.version}"
 
     db_path = paths["outputs"] / temp_db_name
-    schema_sql = schema_file_for(cfg).read_text(encoding="utf-8")
+    # schema_sql = schema_file_for(cfg).read_text(encoding="utf-8")
+    schema_sql = get_sql_schema(cfg.schema_version)
     tables = prepare_database(db_path, schema_sql)
     comb_dict = create_empty_comb_dict(db_path, tables)
 
