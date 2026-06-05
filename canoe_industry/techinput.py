@@ -7,7 +7,8 @@ Created on Fri Aug 15 14:12:38 2025
 from __future__ import annotations
 import pandas as pd
 from typing import Dict
-from common import setup_logging, data_year
+from canoe_industry.common import setup_logging, data_year
+from canoe_schema.v3_2.models import LimitTechInputSplitAnnual
 
 logger = setup_logging()
 
@@ -39,7 +40,7 @@ def build_limit_tech_input_split_industry(
     periods = dom['periods']
     atl_pro = set(dom['atl_pro'])
 
-    rows = []
+    rows: list[LimitTechInputSplitAnnual] = []
     for region in province_list:
         for per in periods:
             for sec in sector_list:
@@ -98,24 +99,33 @@ def build_limit_tech_input_split_industry(
                         missing_total = max(0.0, 1.0 - total_known)
                         final_val = round(missing_total / na_count, 3)
 
-                    rows.append([
-                        region,
-                        per,
-                        f"I_{com}",
-                        f"{sector_abv}{sec}",
-                        'ge',
-                        final_val,
-                        (
-                            f'Calculated from NRCan 2022 comprehensive database (data year '
-                            f'{data_year(per, periods)}). If values were n.a., '
-                            'the remainder to 100% is evenly distributed.'
-                        ),
-                        'I1',
-                        2, 1, 2, 3, 3,
-                        ids[region],
-                    ])
+                    rows.append(
+                        LimitTechInputSplitAnnual(
+                            region=region,
+                            period=per,
+                            input_comm=f"I_{com}",
+                            tech=f"{sector_abv}{sec}",
+                            operator='ge',
+                            proportion=final_val,
+                            notes=(
+                                f'Calculated from NRCan 2022 comprehensive database (data year '
+                                f'{data_year(per, periods)}). If values were n.a., '
+                                'the remainder to 100% is evenly distributed.'
+                            ),
+                            data_source='I1',
+                            dq_cred=2,
+                            dq_geog=1,
+                            dq_struc=2,
+                            dq_tech=3,
+                            dq_time=3,
+                            data_id=ids[region],
+                        )
+                    )
 
-    df = pd.DataFrame(rows, columns=comb_dict['LimitTechInputSplitAnnual'].columns)
+    df = pd.DataFrame(
+        [row.model_dump(mode='python') for row in rows],
+        columns=comb_dict['LimitTechInputSplitAnnual'].columns,
+    )
     comb_dict['LimitTechInputSplitAnnual'] = pd.concat([comb_dict['LimitTechInputSplitAnnual'], df], ignore_index=True)
     logger.info("LimitTechInputSplitAnnual rows: %d", len(rows))
     return comb_dict

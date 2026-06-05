@@ -5,12 +5,7 @@ NRCan_year: 2022 #Check the NRCan website and find the most reason year in the d
 version: '002' #Place within the quotation marks
 
 #Choose the schema version you wish to use; the lower the number, the more simple the representation. Default is 3_1
-schema_version:
-  #- 0
-  #- 1
-  #- 2
-  #- 3
-  - 3_1
+schema_version: "3.2"
 
 #Choose the time periods being included in the study
 periods:

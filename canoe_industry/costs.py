@@ -8,8 +8,8 @@ Created on Fri Aug 15 12:33:38 2025
 from __future__ import annotations
 import pandas as pd
 from typing import Dict
-from common import setup_logging
-import numpy as np
+from canoe_industry.common import setup_logging
+from canoe_schema.v3_2.models import CostInvest
 
 logger = setup_logging()
 
@@ -26,7 +26,7 @@ def build_cost_invest_industry(comb_dict: Dict[str, pd.DataFrame]) -> Dict[str, 
     dem_map = comb_dict['__canoe_dem_to_sec__']
 
     # Optional: restrict to sectors present in ATL via shares (presence gating happens in demands/techinput too)
-    rows = []
+    rows: list[CostInvest] = []
     first_vintage = min(periods)
     for province in province_list:
         for sec in sector_list:
@@ -34,18 +34,22 @@ def build_cost_invest_industry(comb_dict: Dict[str, pd.DataFrame]) -> Dict[str, 
             if province in atl_pro:
                 # We don't know presence here; rely on up/downstream gating. Keep a simple rule: allow all, or integrate a share check in caller.
                 pass
-            rows.append([
-                province,            # region
-                f"{sector_abv}{sec}",# tech
-                first_vintage,       # vintage
-                0.1,                 # cost
-                "M$/PJ",            # units
-                "Arbitrary amount for first time period",
-                np.nan, np.nan, np.nan, np.nan, np.nan, np.nan,
-                ids[province],
-            ])
+            rows.append(
+                CostInvest(
+                    region=province,
+                    tech=f"{sector_abv}{sec}",
+                    vintage=first_vintage,
+                    cost=0.1,
+                    units="M$/PJ",
+                    notes="Arbitrary amount for first time period",
+                    data_id=ids[province],
+                )
+            )
 
-    df = pd.DataFrame(rows, columns=comb_dict['CostInvest'].columns)
+    df = pd.DataFrame(
+        [row.model_dump(mode='python') for row in rows],
+        columns=comb_dict['CostInvest'].columns,
+    )
     comb_dict['CostInvest'] = pd.concat([comb_dict['CostInvest'], df], ignore_index=True)
     logger.info("CostInvest rows: %d", len(rows))
     return comb_dict

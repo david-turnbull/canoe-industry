@@ -10,17 +10,17 @@ import sqlite3
 from typing import Dict
 import pandas as pd
 
-from common import setup_logging, project_paths
-from setup import load_runtime_industry
-from techcom import build_technology_and_commodity_industry
-from data_scraper import load_cached_or_fetch_industry
-from statcan import load_statcan_atl_shares
-from demands import build_demand_and_capacity_industry
+from canoe_industry.common import setup_logging, project_paths
+from canoe_industry.setup import load_runtime_industry
+from canoe_industry.techcom import build_technology_and_commodity_industry
+from canoe_industry.data_scraper import load_cached_or_fetch_industry
+from canoe_industry.statcan import load_statcan_atl_shares
+from canoe_industry.demands import build_demand_and_capacity_industry
 #from costs import build_cost_invest_industry
-from techinput import build_limit_tech_input_split_industry
-from efficiency import build_efficiency_industry
-from post_processing import add_datasets_and_sources_industry
-from post_processing import add_time_ind, update_ids
+from canoe_industry.techinput import build_limit_tech_input_split_industry
+from canoe_industry.efficiency import build_efficiency_industry
+from canoe_industry.post_processing import add_datasets_and_sources_industry
+from canoe_industry.post_processing import add_time_ind, update_ids
 logger = setup_logging()
 
 
