@@ -36,6 +36,21 @@ class Config:
     def nrcan_year(self) -> int:
         return int(self.params.get("NRCan_year", 2022))
 
+    @property
+    def future_periods(self) -> list[int]:
+        return list(self.params.get("future_periods", self.periods))
+
+    @property
+    def province_list(self) -> list[str]:
+        return list(self.params.get(
+            "province_list",
+            ['AB', 'ON', 'BC', 'MB', 'SK', 'QC', 'PEI', 'NB', 'NS', 'NLLAB'],
+        ))
+
+    @property
+    def validation_behavior(self) -> str:
+        return str(self.params.get("validation_behavior", "error"))
+
 
 
 def create_empty_comb_dict(db_path: Path, tables: list[str]) -> Dict[str, pd.DataFrame]:
@@ -57,7 +72,7 @@ def load_runtime_industry(temp_db_name: str = "CAN_industry.sqlite") -> tuple[Pa
     sector_abv = "I_"
     sector_list = ['CON', 'PULP', 'SMELT', 'REFINING', 'CEMENT', 'CHEM', 'STEEL', 'OTH_MAN', 'FOR', 'MINING']
     sector_list_ex = ['Construction', 'Pulp and paper', 'Smelting', 'Petroleum refining', 'Cement', 'Chemical', 'Iron and Steel', 'Other manufacturing', 'Forestry', 'Mining and Oil & Gas extraction']
-    province_list = ['AB', 'ON', 'BC', 'MB', 'SK', 'QC', 'PEI', 'NB', 'NS', 'NLLAB']
+    province_list = cfg.province_list
     commodity_list = ['elc', 'ng', 'dsl', 'hfo', 'pcoke', 'ngl', 'coal', 'coke', 'wood', 'oth']
     commodity_list_ex = ['Electricity', 'Natural Gas', 'Diesel', 'Heavy Fuel Oil', 'Petroleum Coke', 'Natural Gas Liquids', 'Coal', 'Coke', 'Wood', 'Other']
     atl_pro = ['PEI', 'NB', 'NS', 'NLLAB']

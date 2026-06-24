@@ -12,6 +12,7 @@ import pandas as pd
 
 from canoe_industry.common import setup_logging, project_paths
 from canoe_industry.setup import load_runtime_industry
+from canoe_industry.validation import validate_db_against_config
 from canoe_industry.techcom import build_technology_and_commodity_industry
 from canoe_industry.data_scraper import load_cached_or_fetch_industry
 from canoe_industry.statcan import load_statcan_atl_shares
@@ -41,6 +42,10 @@ def main() -> None:
 
     # Initialize DB + comb_dict
     db_path, cfg, tables, comb_dict = load_runtime_industry(temp_db_name=args.db_name)
+
+    # 0) Validate DB against config
+    with sqlite3.connect(db_path) as conn:
+        validate_db_against_config(cfg, conn)
 
     # 1) Tech & Commodity scaffolding
     comb_dict = build_technology_and_commodity_industry(comb_dict)

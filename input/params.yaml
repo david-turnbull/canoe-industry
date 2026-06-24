@@ -14,3 +14,27 @@ periods:
   - 2035
   - 2040
   - 2045
+
+# All industry periods are future (flag='f' in time_period).
+future_periods:
+  - 2025
+  - 2030
+  - 2035
+  - 2040
+  - 2045
+
+# Regions this module writes data for. Must all exist in canoe-base's region table.
+province_list:
+  - AB
+  - ON
+  - BC
+  - MB
+  - SK
+  - QC
+  - PEI
+  - NB
+  - NS
+  - NLLAB
+
+# How to handle a mismatch between this module's config and the DB: "error" or "warning"
+validation_behavior: error
