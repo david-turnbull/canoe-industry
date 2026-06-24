@@ -79,7 +79,7 @@ def _safe_loaded_value(loaded_df: dict, prov: str, nrcan_table_idx: int, year: s
 def build_demand_and_capacity_industry(
     comb_dict: Dict[str, pd.DataFrame],
     loaded_df: dict[str, dict[int, pd.DataFrame]],
-    pop_df: pd.DataFrame,
+    macro_df: pd.DataFrame,
     atl_shares: dict[str, dict[str, float]],
 ) -> Dict[str, pd.DataFrame]:
     """
@@ -91,7 +91,7 @@ def build_demand_and_capacity_industry(
         Working table frames + meta from the setup/techcom stages.
     loaded_df : dict[str, dict[int, pd.DataFrame]]
         NRCan CEUD aggregated tables as returned by data_scraper.load_cached_or_fetch_industry(..).
-    pop_df : pd.DataFrame
+    macro_df : pd.DataFrame
         CER CEF macro indicators (contains Year, Scenario, Variable, Value).
     atl_shares : dict[str, dict[str, float]]
         StatCan ATL presence shares (sector -> {region_name -> share}).
@@ -125,7 +125,7 @@ def build_demand_and_capacity_industry(
     end_years = [data_year(p, periods) for p in periods]
     all_gdp_years = sorted(set([nrcan_year]) | set(end_years))
 
-    gdp_df = pop_df.copy()
+    gdp_df = macro_df.copy()
     gdp_df = gdp_df[gdp_df['Year'].isin(all_gdp_years)]
     gdp_df = gdp_df[gdp_df['Variable'] == 'Real Gross Domestic Product ($2012 Millions)']
     gdp_df = gdp_df[gdp_df['Scenario'] == 'Global Net-zero']

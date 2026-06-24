@@ -33,7 +33,7 @@ def _session(timeout: int = 45) -> requests.Session:
 def load_cached_or_fetch_industry(nrcan_year: int, cache_dir: Path) -> tuple[Dict[str, dict[int, pd.DataFrame]], pd.DataFrame]:
     ensure_dir(cache_dir)
     df_cache = cache_dir / "dataframes.pkl"
-    pop_cache = cache_dir / "pop_df.pkl"
+    pop_cache = cache_dir / "macro_df.pkl"
 
     if df_cache.exists():
         logger.info("Cache hit: %s", df_cache)
@@ -71,12 +71,12 @@ def load_cached_or_fetch_industry(nrcan_year: int, cache_dir: Path) -> tuple[Dic
 
     if pop_cache.exists():
         logger.info("Cache hit: %s", pop_cache)
-        pop_df = pickle.loads(pop_cache.read_bytes())
+        macro_df = pickle.loads(pop_cache.read_bytes())
     else:
         sess = _session()
         r = sess.get(CER_URL, timeout=45)
         r.raise_for_status()
-        pop_df = pd.read_csv(StringIO(r.text))
-        pop_cache.write_bytes(pickle.dumps(pop_df))
+        macro_df = pd.read_csv(StringIO(r.text))
+        pop_cache.write_bytes(pickle.dumps(macro_df))
 
-    return loaded_df, pop_df
+    return loaded_df, macro_df

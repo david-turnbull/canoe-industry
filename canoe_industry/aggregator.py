@@ -47,13 +47,13 @@ def main() -> None:
     comb_dict = build_technology_and_commodity_industry(comb_dict)
 
     # 2) External data (NRCan/CER)
-    loaded_df, pop_df = load_cached_or_fetch_industry(cfg.nrcan_year, project_paths()['cache'])
+    loaded_df, macro_df = load_cached_or_fetch_industry(cfg.nrcan_year, project_paths()['cache'])
 
     # 3) StatCan ATL shares
     atl_shares = load_statcan_atl_shares(project_paths()['cache'])
 
     # 4) Demand + ExistingCapacity (includes ATL allocation and GDP scaling)
-    comb_dict = build_demand_and_capacity_industry(comb_dict, loaded_df, pop_df, atl_shares)
+    comb_dict = build_demand_and_capacity_industry(comb_dict, loaded_df, macro_df, atl_shares)
 
     # 5) LimitTechInputSplitAnnual from NRCan share tables (with ATL presence gating)
     comb_dict = build_limit_tech_input_split_industry(comb_dict, loaded_df, atl_shares)
