@@ -169,7 +169,7 @@ def build_demand_and_capacity_industry(
 
     # Demand baseline (NRCan 2022), ExistingCapacity baseline (NRCan 2021)
     base_2022 = _baseline_dict_for_year('2022')
-    _ = _baseline_dict_for_year('2021')
+    # base_2021 = _baseline_dict_for_year('2021')  # needed when ExistingCapacity is enabled
 
     # ---- Build Demand rows across model periods ----
     dem_rows: list[Demand] = []
@@ -242,9 +242,9 @@ def build_demand_and_capacity_industry(
     else:
         logger.warning("No Demand rows were generated.")
 
-    # # ---- Build ExistingCapacity from previous year (2021) values ----
-    # cap_rows: list[list] = []
-    # cap_year = 2021  # previous to the 2022 baseline (kept from working script)
+    # ---- Build ExistingCapacity from previous year (2021) values ----
+    # cap_year = 2021  # year before the 2022 NRCan baseline
+    # cap_rows: list[ExistingCapacity] = []
 
     # for pro in province_list:
     #     for sec in sector_list:
@@ -256,10 +256,9 @@ def build_demand_and_capacity_industry(
     #             temp_val = base_2021['ATL'].get(dem_key)
     #             if temp_val in (None, 0.0):
     #                 continue
-    #             split_val = _apply_atl_split(temp_val, dem_key, pro, atl_shares, dem_to_sec)
-    #             if split_val is None or split_val == 0.0:
+    #             val = _apply_atl_split(temp_val, dem_key, pro, atl_shares, dem_to_sec)
+    #             if val is None or val == 0.0:
     #                 continue
-    #             val = split_val
     #         else:
     #             val = None
 
@@ -268,23 +267,32 @@ def build_demand_and_capacity_industry(
     #         if val == '0':
     #             val = 0.0
 
-    #         ref = 'I1' if pro not in atl_pro else 'I1I3'
-    #         notes = 'Existing capacity is taken from the NRCan comprehensive energy database, the previous value before demand'
+    #         # ATL values use StatCan shares (I3); non-ATL are direct NRCan reads (I1)
+    #         ref = 'I1' if pro not in atl_pro else 'I3'
 
-    #         cap_rows.append([
-    #             pro,
-    #             sector_abv + sec,
-    #             cap_year,
-    #             float(val),
-    #             'PJ',
-    #             notes,
-    #             ref,
-    #             1, 1, 2, 3, 2,
-    #             ids[pro]
-    #         ])
+    #         cap_rows.append(
+    #             ExistingCapacity(
+    #                 region=pro,
+    #                 tech=sector_abv + sec,
+    #                 vintage=cap_year,
+    #                 capacity=float(val),
+    #                 units='PJ',
+    #                 notes='Existing capacity from NRCan comprehensive energy database, year prior to demand baseline',
+    #                 data_source=ref,
+    #                 dq_cred=1,
+    #                 dq_geog=1,
+    #                 dq_struc=2,
+    #                 dq_tech=3,
+    #                 dq_time=2,
+    #                 data_id=ids[pro],
+    #             )
+    #         )
 
     # if cap_rows:
-    #     cap_df = pd.DataFrame(cap_rows, columns=comb_dict['ExistingCapacity'].columns)
+    #     cap_df = pd.DataFrame(
+    #         [row.model_dump(mode='python') for row in cap_rows],
+    #         columns=comb_dict['ExistingCapacity'].columns,
+    #     )
     #     comb_dict['ExistingCapacity'] = pd.concat([comb_dict['ExistingCapacity'], cap_df], ignore_index=True)
     #     logger.info("ExistingCapacity rows appended: %d", len(cap_rows))
     # else:

@@ -20,7 +20,6 @@ from canoe_industry.demands import build_demand_and_capacity_industry
 from canoe_industry.techinput import build_limit_tech_input_split_industry
 from canoe_industry.efficiency import build_efficiency_industry
 from canoe_industry.post_processing import add_datasets_and_sources_industry
-from canoe_industry.post_processing import add_time_ind, update_ids
 logger = setup_logging()
 
 
@@ -66,9 +65,7 @@ def main() -> None:
 
     # 8) DataSet + DataSource
     comb_dict = add_datasets_and_sources_industry(comb_dict)
-    #9) Add testing parameters including time and region
-    comb_dict = add_time_ind(comb_dict)
-    #comb_dict= update_ids(comb_dict)
+
     # 9) Persist
     write_comb_dict_to_db(db_path, tables, comb_dict)
     logger.info("Done. SQLite written to %s", db_path)

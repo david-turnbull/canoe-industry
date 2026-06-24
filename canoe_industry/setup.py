@@ -9,8 +9,7 @@ import sqlite3
 from pathlib import Path
 from typing import Dict
 import pandas as pd
-from canoe_schema.sql import get_sql_schema
-from canoe_industry.common import setup_logging, load_yaml, ensure_dir, project_paths
+from canoe_industry.common import setup_logging, load_yaml, project_paths
 
 logger = setup_logging()
 
@@ -37,27 +36,6 @@ class Config:
     def nrcan_year(self) -> int:
         return int(self.params.get("NRCan_year", 2022))
 
-
-def schema_file_for(cfg: Config) -> Path:
-    paths = project_paths()
-    # if cfg.schema_version != 31:
-    #     return paths["schema"] / f"schema_{cfg.schema_version}.sql"
-    return paths["schema"] / "canoe_dataset_schema.sql"
-
-
-def prepare_database(db_path: Path, schema_sql: str) -> list[str]:
-    ensure_dir(db_path.parent)
-    if db_path.exists():
-        db_path.unlink()
-        logger.info("Removed existing DB: %s", db_path)
-
-    with sqlite3.connect(db_path) as conn:
-        conn.executescript(schema_sql)
-        tables = [r[0] for r in conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table';"
-        ).fetchall()]
-    logger.info("Prepared new DB with %d tables", len(tables))
-    return tables
 
 
 def create_empty_comb_dict(db_path: Path, tables: list[str]) -> Dict[str, pd.DataFrame]:
@@ -89,9 +67,16 @@ def load_runtime_industry(temp_db_name: str = "CAN_industry.sqlite") -> tuple[Pa
     id_dict['CAN'] = f"INDHR{cfg.version}"
 
     db_path = paths["outputs"] / temp_db_name
-    # schema_sql = schema_file_for(cfg).read_text(encoding="utf-8")
-    schema_sql = get_sql_schema(cfg.schema_version)
-    tables = prepare_database(db_path, schema_sql)
+    if not db_path.exists():
+        raise FileNotFoundError(
+            f"Database not found at {db_path}. "
+            "canoe-base must create the database before this module runs."
+        )
+    with sqlite3.connect(db_path) as conn:
+        tables = [r[0] for r in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table';"
+        ).fetchall()]
+    logger.info("Opened existing DB at %s (%d tables)", db_path, len(tables))
     comb_dict = create_empty_comb_dict(db_path, tables)
 
     # embed domain/meta for downstream modules
