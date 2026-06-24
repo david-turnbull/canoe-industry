@@ -7,8 +7,6 @@ Created on Sun Aug 17 13:36:00 2025
 from __future__ import annotations
 import argparse
 import sqlite3
-from typing import Dict
-import pandas as pd
 
 from canoe_industry.common import setup_logging, project_paths
 from canoe_industry.setup import load_runtime_industry
@@ -17,22 +15,11 @@ from canoe_industry.techcom import build_technology_and_commodity_industry
 from canoe_industry.data_scraper import load_cached_or_fetch_industry
 from canoe_industry.statcan import load_statcan_atl_shares
 from canoe_industry.demands import build_demand_and_capacity_industry
-#from costs import build_cost_invest_industry
-from canoe_industry.techinput import build_limit_tech_input_split_industry
-from canoe_industry.efficiency import build_efficiency_industry
+from canoe_industry.techinput import build_limit_tech_and_efficiency_industry
+# from canoe_industry.costs import build_cost_invest_industry  # TODO: complete CostInvest migration
 from canoe_industry.post_processing import add_datasets_and_sources_industry
+
 logger = setup_logging()
-
-
-def write_comb_dict_to_db(db_path, tables, comb_dict: Dict[str, pd.DataFrame]) -> None:
-    with sqlite3.connect(db_path) as conn:
-        for table in tables:
-            df = comb_dict.get(table)
-            if df is None or df.empty:
-                logger.warning("Skipping table with no rows: %s", table)
-                continue
-            df.to_sql(table, conn, if_exists="append", index=False)
-            logger.info("Wrote %d rows to %s", len(df), table)
 
 
 def main() -> None:
@@ -40,39 +27,37 @@ def main() -> None:
     parser.add_argument("--db-name", default="CAN_industry.sqlite", help="Output SQLite filename")
     args = parser.parse_args()
 
-    # Initialize DB + comb_dict
-    db_path, cfg, tables, comb_dict = load_runtime_industry(temp_db_name=args.db_name)
+    db_path, cfg, meta = load_runtime_industry(temp_db_name=args.db_name)
 
-    # 0) Validate DB against config
     with sqlite3.connect(db_path) as conn:
+        # 0) Validate DB against config
         validate_db_against_config(cfg, conn)
 
-    # 1) Tech & Commodity scaffolding
-    comb_dict = build_technology_and_commodity_industry(comb_dict)
+        cur = conn.cursor()
 
-    # 2) External data (NRCan/CER)
-    loaded_df, macro_df = load_cached_or_fetch_industry(cfg.nrcan_year, project_paths()['cache'])
+        # 1) Tech & Commodity scaffolding
+        build_technology_and_commodity_industry(meta, cur)
 
-    # 3) StatCan ATL shares
-    atl_shares = load_statcan_atl_shares(project_paths()['cache'])
+        # 2) External data (NRCan/CER)
+        loaded_df, macro_df = load_cached_or_fetch_industry(cfg.nrcan_year, project_paths()['cache'])
 
-    # 4) Demand + ExistingCapacity (includes ATL allocation and GDP scaling)
-    comb_dict = build_demand_and_capacity_industry(comb_dict, loaded_df, macro_df, atl_shares)
+        # 3) StatCan ATL shares
+        atl_shares = load_statcan_atl_shares(project_paths()['cache'])
 
-    # 5) LimitTechInputSplitAnnual from NRCan share tables (with ATL presence gating)
-    comb_dict = build_limit_tech_input_split_industry(comb_dict, loaded_df, atl_shares)
+        # 4) Demand + ExistingCapacity
+        build_demand_and_capacity_industry(meta, cur, loaded_df, macro_df, atl_shares)
 
-    # 6) Efficiency derived from techinput mapping
-    comb_dict = build_efficiency_industry(comb_dict)
+        # 5) LimitTechInputSplitAnnual + Efficiency (co-constructed)
+        build_limit_tech_and_efficiency_industry(meta, cur, loaded_df, atl_shares)
 
-    # 7) Costs (simple placeholder; gated upstream by presence already)
-    #comb_dict = build_cost_invest_industry(comb_dict)
+        # 6) Costs (TODO: complete CostInvest migration before uncommenting)
+        # build_cost_invest_industry(meta, cur)
 
-    # 8) DataSet + DataSource
-    comb_dict = add_datasets_and_sources_industry(comb_dict)
+        # 7) DataSet + DataSource
+        add_datasets_and_sources_industry(meta, cur)
 
-    # 9) Persist
-    write_comb_dict_to_db(db_path, tables, comb_dict)
+        conn.commit()
+
     logger.info("Done. SQLite written to %s", db_path)
 
 

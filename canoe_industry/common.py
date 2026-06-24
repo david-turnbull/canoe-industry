@@ -13,6 +13,14 @@ import yaml
 
 LOGGER_NAME = "industry_etl"
 
+# TODO (Step 5): move into CANOEIndustryConfig / a shared canoe-common package
+ATL_MAP: dict[str, str] = {
+    'PEI': 'Prince Edward Island',
+    'NB': 'New Brunswick',
+    'NS': 'Nova Scotia',
+    'NLLAB': 'Newfoundland and Labrador',
+}
+
 
 def setup_logging(level: int = logging.INFO) -> logging.Logger:
     logger = logging.getLogger(LOGGER_NAME)
