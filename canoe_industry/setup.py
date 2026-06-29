@@ -39,6 +39,7 @@ class CANOEIndustryConfig(BaseModel):
     schema_version: str = "4.0"
     version: str
     db_dir: str = "outputs"
+    db_name: str = "CAN_industry.sqlite"
     future_periods: list[int]
     province_list: list[str]  # TODO: CANOEProvince — see canoe-agriculture
     atl_provinces: list[str]
@@ -60,8 +61,7 @@ class CANOEIndustryConfig(BaseModel):
         return self.future_periods
 
     @classmethod
-    def validate_from_toml(cls, config_dir: str | Path = ".") -> "CANOEIndustryConfig":
-        config_path = Path(config_dir) / "canoe_industry.toml"
+    def validate_from_toml(cls, config_path: str | Path) -> "CANOEIndustryConfig":
         with open(config_path, "rb") as f:
             data = tomllib.load(f)
         return cls(**data)
@@ -144,12 +144,17 @@ class CANOEIndustryRuntime:
 
 
 def load_runtime_industry(
-    temp_db_name: str = "CAN_industry.sqlite",
+    db_path: str | Path | None = None,
+    config_path: str | Path | None = None,
 ) -> CANOEIndustryRuntime:
     paths = project_paths()
-    cfg = CANOEIndustryConfig.validate_from_toml(paths["root"])
+    if config_path is None:
+        config_path = paths["root"] / "canoe_industry.toml"
+    cfg = CANOEIndustryConfig.validate_from_toml(config_path)
 
-    db_path = paths["root"] / cfg.db_dir / temp_db_name
+    if db_path is None:
+        db_path = paths["root"] / cfg.db_dir / cfg.db_name
+    db_path = Path(db_path)
     if not db_path.exists():
         raise FileNotFoundError(
             f"Database not found at {db_path}. "

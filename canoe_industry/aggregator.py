@@ -24,10 +24,11 @@ logger = setup_logging()
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Industry ETL Aggregator")
-    parser.add_argument("--db-name", default="CAN_industry.sqlite", help="Output SQLite filename")
+    parser.add_argument("--db-path", default=None, help="Full path to the SQLite file (default: <db_dir from config>/CAN_industry.sqlite)")
+    parser.add_argument("--config", default=None, help="Path to canoe_industry.toml (default: <project-root>/canoe_industry.toml)")
     args = parser.parse_args()
 
-    runtime = load_runtime_industry(temp_db_name=args.db_name)
+    runtime = load_runtime_industry(db_path=args.db_path, config_path=args.config)
 
     with sqlite3.connect(runtime.db_path) as conn:
         # 0) Validate DB against config
