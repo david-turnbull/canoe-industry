@@ -4,8 +4,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
+import tomllib
 from pydantic import BaseModel, ConfigDict
-from canoe_industry.common import setup_logging, load_yaml, project_paths
+from canoe_industry.common import setup_logging, project_paths
 
 logger = setup_logging()
 
@@ -59,8 +60,11 @@ class CANOEIndustryConfig(BaseModel):
         return self.future_periods
 
     @classmethod
-    def validate_from_yaml(cls, yaml_path: Path) -> "CANOEIndustryConfig":
-        return cls(**load_yaml(yaml_path))
+    def validate_from_toml(cls, config_dir: str | Path = ".") -> "CANOEIndustryConfig":
+        config_path = Path(config_dir) / "canoe_industry.toml"
+        with open(config_path, "rb") as f:
+            data = tomllib.load(f)
+        return cls(**data)
 
 
 @dataclass
@@ -143,7 +147,7 @@ def load_runtime_industry(
     temp_db_name: str = "CAN_industry.sqlite",
 ) -> CANOEIndustryRuntime:
     paths = project_paths()
-    cfg = CANOEIndustryConfig.validate_from_yaml(paths["input"] / "params.yaml")
+    cfg = CANOEIndustryConfig.validate_from_toml(paths["root"])
 
     db_path = paths["root"] / cfg.db_dir / temp_db_name
     if not db_path.exists():
