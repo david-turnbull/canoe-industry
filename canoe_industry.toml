@@ -4,7 +4,7 @@
 schema_version = "4.0"
 version        = "002"
 db_dir         = "outputs"
-db_name        = "CAN_industry.sqlite"
+db_name        = "canoe.sqlite"
 nrcan_year     = 2022
 gdp_scenario   = "Global Net-zero"
 gdp_variable   = "Real Gross Domestic Product ($2012 Millions)"

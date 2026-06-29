@@ -42,7 +42,7 @@ def build_limit_tech_and_efficiency_industry(
     for region in province_list:
         for per in periods:
             for sec in sector_list:
-                rn = SECTOR_TABLE_MAP.get(sec)
+                rn = sector_table_map.get(sec)
                 if rn is None:
                     continue
 
@@ -55,7 +55,7 @@ def build_limit_tech_and_efficiency_industry(
 
                 tis_vals: list[float | str] = []
                 coms: list[str] = []
-                for com, idx in COM_TO_COL.items():
+                for com, idx in com_to_col.items():
                     try:
                         value = (
                             loaded_df['ATL'][rn]['2022'][idx] if region in atl_pro
