@@ -9,20 +9,10 @@ a second pass over the data.
 from __future__ import annotations
 import sqlite3
 from canoe_industry.common import setup_logging, data_year, ATL_MAP
+from canoe_industry.setup import CANOEIndustryRuntime
 from canoe_schema.v4_0.models import Efficiency, LimitTechInputSplitAnnual
 
 logger = setup_logging()
-
-# TODO (Step 5): move these lookup tables into CANOEIndustrySector / CANOEInputFuel config models
-SECTOR_TABLE_MAP = {
-    'CON': 3, 'PULP': 4, 'SMELT': 5, 'REFINING': 6, 'CEMENT': 7,
-    'CHEM': 8, 'STEEL': 9, 'OTH_MAN': 10, 'FOR': 11, 'MINING': 12,
-}
-
-COM_TO_COL = {
-    'elc': 13, 'ng': 14, 'dsl': 15, 'hfo': 16, 'pcoke': 17,
-    'ngl': 18, 'coal': 19, 'coke': 20, 'wood': 21, 'oth': 22,
-}
 
 
 def _to_output_comm(sector_abv: str, sec: str) -> str:
@@ -30,18 +20,21 @@ def _to_output_comm(sector_abv: str, sec: str) -> str:
 
 
 def build_limit_tech_and_efficiency_industry(
-    meta: dict,
+    runtime: CANOEIndustryRuntime,
     cursor: sqlite3.Cursor,
     loaded_df: dict[str, dict[int, object]],
     atl_shares: dict[str, dict[str, float]],
 ) -> None:
-    province_list: list[str] = meta['province_list']
-    sector_list: list[str] = meta['sector_list']
-    sector_abv: str = meta['sector_abv']
-    periods: list[int] = meta['periods']
-    atl_pro: set[str] = set(meta['atl_pro'])
-    ids: dict[str, str] = meta['ids']
-    dem_map: dict[str, str] = meta['canoe_dem_to_sec']
+    province_list = runtime.province_list
+    sector_list = runtime.sector_list
+    sector_abv = runtime.sector_abv
+    periods = runtime.periods
+    atl_pro = runtime.atl_pro
+    ids = runtime.ids
+    dem_map = runtime.canoe_dem_to_sec
+    sector_table_map = runtime.sector_table_map
+    com_to_col = runtime.com_to_col
+    dq = runtime.dq_limit_tech_input
 
     ltisa_rows: list[LimitTechInputSplitAnnual] = []
     eff_rows: list[Efficiency] = []
@@ -119,11 +112,11 @@ def build_limit_tech_and_efficiency_industry(
                                 'the remainder to 100% is evenly distributed.'
                             ),
                             data_source='I1',
-                            dq_cred=2,
-                            dq_geog=1,
-                            dq_struc=2,
-                            dq_tech=3,
-                            dq_time=3,
+                            dq_cred=dq.dq_cred,
+                            dq_geog=dq.dq_geog,
+                            dq_struc=dq.dq_struc,
+                            dq_tech=dq.dq_tech,
+                            dq_time=dq.dq_time,
                             data_id=ids[region],
                         )
                     )

@@ -7,18 +7,19 @@ Created on Fri Aug 15 08:34:22 2025
 from __future__ import annotations
 import sqlite3
 from canoe_industry.common import setup_logging
+from canoe_industry.setup import CANOEIndustryRuntime
 from canoe_schema.v4_0.models import Commodity, Technology
 
 logger = setup_logging()
 
 
-def build_technology_and_commodity_industry(meta: dict, cursor: sqlite3.Cursor) -> None:
-    sector_abv = meta['sector_abv']
-    sector_list = meta['sector_list']
-    sector_list_ex = meta['sector_list_ex']
-    commodity_list = meta['commodity_list']
-    commodity_list_ex = meta['commodity_list_ex']
-    ids = meta['ids']
+def build_technology_and_commodity_industry(runtime: CANOEIndustryRuntime, cursor: sqlite3.Cursor) -> None:
+    sector_abv = runtime.sector_abv
+    sector_list = runtime.sector_list
+    sector_list_ex = runtime.sector_list_ex
+    commodity_list = runtime.commodity_list
+    commodity_list_ex = runtime.commodity_list_ex
+    ids = runtime.ids
 
     tech_rows = [
         Technology(
@@ -56,6 +57,4 @@ def build_technology_and_commodity_industry(meta: dict, cursor: sqlite3.Cursor) 
 
     cursor.executemany(*Technology.bulk_insert_or_ignore_sql(tech_rows))
     cursor.executemany(*Commodity.bulk_insert_or_ignore_sql(comm_rows))
-
-    meta['demand_com_list'] = demand_com_list
     logger.info("Built %d Technology and %d Commodity rows", len(tech_rows), len(comm_rows))

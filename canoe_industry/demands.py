@@ -5,6 +5,7 @@ Industry: Demand & ExistingCapacity builder
 from __future__ import annotations
 import sqlite3
 from canoe_industry.common import setup_logging, data_year, ATL_MAP
+from canoe_industry.setup import CANOEIndustryRuntime
 from canoe_schema.v4_0.models import Demand, ExistingCapacity
 
 logger = setup_logging()
@@ -42,26 +43,24 @@ def _safe_loaded_value(
 
 
 def build_demand_and_capacity_industry(
-    meta: dict,
+    runtime: CANOEIndustryRuntime,
     cursor: sqlite3.Cursor,
     loaded_df: dict[str, dict[int, object]],
     macro_df: object,
     atl_shares: dict[str, dict[str, float]],
 ) -> None:
-    sector_abv: str = meta['sector_abv']
-    province_list: list[str] = meta['province_list']
-    sector_list: list[str] = meta['sector_list']
-    atl_pro: set[str] = set(meta['atl_pro'])
-    periods: list[int] = meta['periods']
-    ids: dict[str, str] = meta['ids']
-    dem_to_sec: dict[str, str] = meta['canoe_dem_to_sec']
-
-    demand_com_list: list[str] = meta.get('demand_com_list', [f"D_{s}" for s in sector_list])
-
-    # TODO (Step 5): move nrcan_year, gdp_scenario, gdp_variable to CANOEIndustryConfig
-    nrcan_year: int = 2022
-    gdp_scenario = 'Global Net-zero'
-    gdp_variable = 'Real Gross Domestic Product ($2012 Millions)'
+    sector_abv = runtime.sector_abv
+    province_list = runtime.province_list
+    sector_list = runtime.sector_list
+    atl_pro = runtime.atl_pro
+    periods = runtime.periods
+    ids = runtime.ids
+    dem_to_sec = runtime.canoe_dem_to_sec
+    demand_com_list = runtime.demand_com_list
+    nrcan_year = runtime.nrcan_year
+    gdp_scenario = runtime.gdp_scenario
+    gdp_variable = runtime.gdp_variable
+    dq = runtime.dq_demand
 
     import pandas as pd
     gdp_df = macro_df.copy()
@@ -145,11 +144,11 @@ def build_demand_and_capacity_industry(
                         units='PJ',
                         notes=notes,
                         data_source=ref,
-                        dq_cred=1,
-                        dq_geog=1,
-                        dq_struc=2,
-                        dq_tech=3,
-                        dq_time=2,
+                        dq_cred=dq.dq_cred,
+                        dq_geog=dq.dq_geog,
+                        dq_struc=dq.dq_struc,
+                        dq_tech=dq.dq_tech,
+                        dq_time=dq.dq_time,
                         data_id=ids[pro],
                     )
                 )

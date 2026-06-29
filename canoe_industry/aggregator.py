@@ -27,38 +27,38 @@ def main() -> None:
     parser.add_argument("--db-name", default="CAN_industry.sqlite", help="Output SQLite filename")
     args = parser.parse_args()
 
-    db_path, cfg, meta = load_runtime_industry(temp_db_name=args.db_name)
+    runtime = load_runtime_industry(temp_db_name=args.db_name)
 
-    with sqlite3.connect(db_path) as conn:
+    with sqlite3.connect(runtime.db_path) as conn:
         # 0) Validate DB against config
-        validate_db_against_config(cfg, conn)
+        validate_db_against_config(runtime.cfg, conn)
 
         cur = conn.cursor()
 
         # 1) Tech & Commodity scaffolding
-        build_technology_and_commodity_industry(meta, cur)
+        build_technology_and_commodity_industry(runtime, cur)
 
         # 2) External data (NRCan/CER)
-        loaded_df, macro_df = load_cached_or_fetch_industry(cfg.nrcan_year, project_paths()['cache'])
+        loaded_df, macro_df = load_cached_or_fetch_industry(runtime.nrcan_year, project_paths()['cache'])
 
         # 3) StatCan ATL shares
         atl_shares = load_statcan_atl_shares(project_paths()['cache'])
 
         # 4) Demand + ExistingCapacity
-        build_demand_and_capacity_industry(meta, cur, loaded_df, macro_df, atl_shares)
+        build_demand_and_capacity_industry(runtime, cur, loaded_df, macro_df, atl_shares)
 
         # 5) LimitTechInputSplitAnnual + Efficiency (co-constructed)
-        build_limit_tech_and_efficiency_industry(meta, cur, loaded_df, atl_shares)
+        build_limit_tech_and_efficiency_industry(runtime, cur, loaded_df, atl_shares)
 
         # 6) Costs (TODO: complete CostInvest migration before uncommenting)
-        # build_cost_invest_industry(meta, cur)
+        # build_cost_invest_industry(runtime, cur)
 
         # 7) DataSet + DataSource
-        add_datasets_and_sources_industry(meta, cur)
+        add_datasets_and_sources_industry(runtime, cur)
 
         conn.commit()
 
-    logger.info("Done. SQLite written to %s", db_path)
+    logger.info("Done. SQLite written to %s", runtime.db_path)
 
 
 if __name__ == "__main__":

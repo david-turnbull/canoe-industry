@@ -1,21 +1,13 @@
-#Write the version of the NRCan Comprehensive database you wish to use
-NRCan_year: 2022 #Check the NRCan website and find the most reason year in the database, that is the value to use
+# NRCan Comprehensive Database vintage year
+nrcan_year: 2022
 
-#Version control: What version of the data are we using, we track numerically and they can be found in DataSet table
-version: '002' #Place within the quotation marks
+# Version control (tracked in DataSet table)
+version: '002'
 
-#Choose the schema version you wish to use; the lower the number, the more simple the representation. Default is 3_1
-schema_version: "3.2"
+# Schema version
+schema_version: "4.0"
 
-#Choose the time periods being included in the study
-periods:
-  - 2025
-  - 2030
-  - 2035
-  - 2040
-  - 2045
-
-# All industry periods are future (flag='f' in time_period).
+# Time periods (all industry periods are future, flag='f' in time_period)
 future_periods:
   - 2025
   - 2030
@@ -23,10 +15,10 @@ future_periods:
   - 2040
   - 2045
 
-# Regions this module writes data for. Must all exist in canoe-base's region table.
+# Regions this module writes data for (must all exist in canoe-base's region table)
 province_list:
   - AB
-  - ON
+  - "ON"  # must be quoted — bare ON is parsed as boolean True in YAML 1.1
   - BC
   - MB
   - SK
@@ -36,5 +28,123 @@ province_list:
   - NS
   - NLLAB
 
+# Provinces whose demands are derived from the NRCan ATL aggregate via StatCan shares
+atl_provinces:
+  - PEI
+  - NB
+  - NS
+  - NLLAB
+
+# Output directory relative to project root
+db_dir: outputs
+
 # How to handle a mismatch between this module's config and the DB: "error" or "warning"
 validation_behavior: error
+
+# CER Canada Energy Futures GDP scenario used for demand scaling
+gdp_scenario: "Global Net-zero"
+gdp_variable: "Real Gross Domestic Product ($2012 Millions)"
+
+# Input fuel definitions.
+# nrcan_col_idx: column index in NRCan comprehensive DB sector tables (1-indexed row).
+input_fuels:
+  - shortname: elc
+    longname: Electricity
+    nrcan_col_idx: 13
+  - shortname: ng
+    longname: Natural Gas
+    nrcan_col_idx: 14
+  - shortname: dsl
+    longname: Diesel
+    nrcan_col_idx: 15
+  - shortname: hfo
+    longname: Heavy Fuel Oil
+    nrcan_col_idx: 16
+  - shortname: pcoke
+    longname: Petroleum Coke
+    nrcan_col_idx: 17
+  - shortname: ngl
+    longname: Natural Gas Liquids
+    nrcan_col_idx: 18
+  - shortname: coal
+    longname: Coal
+    nrcan_col_idx: 19
+  - shortname: coke
+    longname: Coke
+    nrcan_col_idx: 20
+  - shortname: wood
+    longname: Wood
+    nrcan_col_idx: 21
+  - shortname: oth
+    longname: Other
+    nrcan_col_idx: 22
+
+# Industry sector definitions.
+# statcan_sector_name must match the exact string used as a key in StatCan table 25-10-0029-01.
+sectors:
+  - shortname: CON
+    longname: Construction
+    nrcan_table_idx: 3
+    canoe_dem_key: D_CON
+    statcan_sector_name: "Construction"
+  - shortname: PULP
+    longname: Pulp and paper
+    nrcan_table_idx: 4
+    canoe_dem_key: D_PULP
+    statcan_sector_name: "Pulp and paper manufacturing"
+  - shortname: SMELT
+    longname: Smelting
+    nrcan_table_idx: 5
+    canoe_dem_key: D_SMELT
+    statcan_sector_name: "Aluminum and non-ferrous metal manufacturing"
+  - shortname: REFINING
+    longname: Petroleum refining
+    nrcan_table_idx: 6
+    canoe_dem_key: D_REFINING
+    statcan_sector_name: "Refined petroleum products manufacturing"
+  - shortname: CEMENT
+    longname: Cement
+    nrcan_table_idx: 7
+    canoe_dem_key: D_CEMENT
+    statcan_sector_name: "Cement manufacturing"
+  - shortname: CHEM
+    longname: Chemical
+    nrcan_table_idx: 8
+    canoe_dem_key: D_CHEM
+    statcan_sector_name: "Chemicals manufacturing"
+  - shortname: STEEL
+    longname: Iron and Steel
+    nrcan_table_idx: 9
+    canoe_dem_key: D_STEEL
+    # Leading space is intentional — matches the raw string in StatCan table 25-10-0029-01
+    statcan_sector_name: " Iron and steel manufacturing"
+  - shortname: OTH_MAN
+    longname: Other manufacturing
+    nrcan_table_idx: 10
+    canoe_dem_key: D_OTH_MAN
+    statcan_sector_name: "All other manufacturing"
+  - shortname: FOR
+    longname: Forestry
+    nrcan_table_idx: 11
+    canoe_dem_key: D_FOR
+    statcan_sector_name: "Forestry, logging and support activities"
+  - shortname: MINING
+    longname: Mining and Oil & Gas extraction
+    nrcan_table_idx: 12
+    canoe_dem_key: D_MINING
+    statcan_sector_name: "Total mining and oil and gas extraction"
+
+# Data quality profiles applied to each table type
+dq_demand:
+  dq_cred: 1
+  dq_geog: 1
+  dq_struc: 2
+  dq_tech: 3
+  dq_time: 2
+
+dq_limit_tech_input:
+  dq_cred: 2
+  dq_geog: 1
+  dq_struc: 2
+  dq_tech: 3
+  dq_time: 3

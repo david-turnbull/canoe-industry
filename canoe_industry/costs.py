@@ -10,17 +10,18 @@ Created on Fri Aug 15 12:33:38 2025
 from __future__ import annotations
 import sqlite3
 from canoe_industry.common import setup_logging
+from canoe_industry.setup import CANOEIndustryRuntime
 from canoe_schema.v4_0.models import CostInvest
 
 logger = setup_logging()
 
 
-def build_cost_invest_industry(meta: dict, cursor: sqlite3.Cursor) -> None:
-    province_list: list[str] = meta['province_list']
-    sector_list: list[str] = meta['sector_list']
-    sector_abv: str = meta['sector_abv']
-    periods: list[int] = meta['periods']
-    ids: dict[str, str] = meta['ids']
+def build_cost_invest_industry(runtime: CANOEIndustryRuntime, cursor: sqlite3.Cursor) -> None:
+    province_list = runtime.province_list
+    sector_list = runtime.sector_list
+    sector_abv = runtime.sector_abv
+    periods = runtime.periods
+    ids = runtime.ids
 
     first_vintage = min(periods)
     rows: list[CostInvest] = []

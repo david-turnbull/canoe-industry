@@ -7,15 +7,16 @@ Created on Sun Aug 17 13:04:16 2025
 from __future__ import annotations
 import sqlite3
 from canoe_industry.common import setup_logging
+from canoe_industry.setup import CANOEIndustryRuntime
 from canoe_schema.v4_0.models import DataSet, DataSource
 
 logger = setup_logging()
 
 
-def add_datasets_and_sources_industry(meta: dict, cursor: sqlite3.Cursor) -> None:
-    province_list: list[str] = meta['province_list']
-    ids: dict[str, str] = meta['ids']
-    version: str = meta['version']
+def add_datasets_and_sources_industry(runtime: CANOEIndustryRuntime, cursor: sqlite3.Cursor) -> None:
+    province_list = runtime.province_list
+    ids = runtime.ids
+    version = runtime.version
 
     ds_rows: list[DataSet] = [
         DataSet(
