@@ -9,9 +9,16 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 from typing import Any, Dict
-import yaml
 
 LOGGER_NAME = "industry_etl"
+
+# TODO (Step 5): move into CANOEIndustryConfig / a shared canoe-common package
+ATL_MAP: dict[str, str] = {
+    'PEI': 'Prince Edward Island',
+    'NB': 'New Brunswick',
+    'NS': 'Nova Scotia',
+    'NLLAB': 'Newfoundland and Labrador',
+}
 
 
 def setup_logging(level: int = logging.INFO) -> logging.Logger:
@@ -27,10 +34,6 @@ def setup_logging(level: int = logging.INFO) -> logging.Logger:
         logger.addHandler(handler)
     return logger
 
-
-def load_yaml(path: Path) -> Dict[str, Any]:
-    with path.open("r", encoding="utf-8") as f:
-        return yaml.safe_load(f)
 
 
 def ensure_dir(path: Path) -> Path:

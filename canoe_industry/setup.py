@@ -1,126 +1,165 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Thu Aug 14 19:26:36 2025
-
-@author: david
-"""
 from __future__ import annotations
-import sqlite3
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict
-import pandas as pd
-from canoe_schema.sql import get_sql_schema
-from canoe_industry.common import setup_logging, load_yaml, ensure_dir, project_paths
+from typing import Literal
+
+import tomllib
+from pydantic import BaseModel, ConfigDict
+from canoe_industry.common import setup_logging, project_paths
 
 logger = setup_logging()
 
 
-class Config:
-    def __init__(self, params: dict):
-        self.params = params
+class CANOEInputFuel(BaseModel):
+    shortname: str
+    longname: str
+    nrcan_col_idx: int
+
+
+class CANOEIndustrySector(BaseModel):
+    shortname: str
+    longname: str
+    nrcan_table_idx: int
+    canoe_dem_key: str
+    statcan_sector_name: str
+
+
+class DataQualityProfile(BaseModel):
+    dq_cred: int
+    dq_geog: int
+    dq_struc: int
+    dq_tech: int
+    dq_time: int
+
+
+class CANOEIndustryConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: str = "4.0"
+    version: str
+    db_dir: str = "outputs"
+    db_name: str = "CAN_industry.sqlite"
+    future_periods: list[int]
+    province_list: list[str]  # TODO: CANOEProvince — see canoe-agriculture
+    atl_provinces: list[str]
+    validation_behavior: Literal["error", "warning"] = "error"
+    nrcan_year: int = 2022
+    gdp_scenario: str = "Global Net-zero"
+    gdp_variable: str = "Real Gross Domestic Product ($2012 Millions)"
+    input_fuels: list[CANOEInputFuel]
+    sectors: list[CANOEIndustrySector]
+    dq_demand: DataQualityProfile
+    dq_limit_tech_input: DataQualityProfile
 
     @property
-    def schema_version(self) -> int:
-        v = self.params.get("schema_version", "3.2")
-        return str(v)
-
-    @property
-    def version(self) -> str:
-        v = self.params.get("version", "1")
-        return f"{int(v):03d}"  # "001", "012", "123"
+    def formatted_version(self) -> str:
+        return f"{int(self.version):03d}"
 
     @property
     def periods(self) -> list[int]:
-        return list(self.params.get("periods", [2025]))
+        return self.future_periods
+
+    @classmethod
+    def validate_from_toml(cls, config_path: str | Path) -> "CANOEIndustryConfig":
+        with open(config_path, "rb") as f:
+            data = tomllib.load(f)
+        return cls(**data)
+
+
+@dataclass
+class CANOEIndustryRuntime:
+    """Typed runtime context derived from CANOEIndustryConfig.
+
+    Computed once at startup; passed by reference to every builder function.
+    Replaces the untyped `meta: dict` anti-pattern.
+    """
+    cfg: CANOEIndustryConfig
+    db_path: Path
+
+    # Lookup tables and ID maps — derived once in __post_init__
+    ids: dict[str, str] = field(init=False)
+    sector_list: list[str] = field(init=False)
+    sector_list_ex: list[str] = field(init=False)
+    commodity_list: list[str] = field(init=False)
+    commodity_list_ex: list[str] = field(init=False)
+    demand_com_list: list[str] = field(init=False)
+    sector_table_map: dict[str, int] = field(init=False)
+    com_to_col: dict[str, int] = field(init=False)
+    canoe_dem_to_sec: dict[str, str] = field(init=False)
+
+    def __post_init__(self) -> None:
+        fv = self.cfg.formatted_version
+        self.ids = {p: f"INDHR{p}{fv}" for p in self.cfg.province_list}
+        self.ids["CAN"] = f"INDHR{fv}"
+        self.sector_list = [s.shortname for s in self.cfg.sectors]
+        self.sector_list_ex = [s.longname for s in self.cfg.sectors]
+        self.commodity_list = [f.shortname for f in self.cfg.input_fuels]
+        self.commodity_list_ex = [f.longname for f in self.cfg.input_fuels]
+        self.demand_com_list = [f"D_{s.shortname}" for s in self.cfg.sectors]
+        self.sector_table_map = {s.shortname: s.nrcan_table_idx for s in self.cfg.sectors}
+        self.com_to_col = {f.shortname: f.nrcan_col_idx for f in self.cfg.input_fuels}
+        self.canoe_dem_to_sec = {s.canoe_dem_key: s.statcan_sector_name for s in self.cfg.sectors}
+
+    # Thin delegates to cfg — spares callers from going through .cfg for common fields
+    @property
+    def sector_abv(self) -> str:
+        return "I_"
+
+    @property
+    def province_list(self) -> list[str]:
+        return self.cfg.province_list
+
+    @property
+    def atl_pro(self) -> set[str]:
+        return set(self.cfg.atl_provinces)
+
+    @property
+    def periods(self) -> list[int]:
+        return self.cfg.future_periods
+
+    @property
+    def version(self) -> str:
+        return self.cfg.formatted_version
 
     @property
     def nrcan_year(self) -> int:
-        return int(self.params.get("NRCan_year", 2022))
+        return self.cfg.nrcan_year
+
+    @property
+    def gdp_scenario(self) -> str:
+        return self.cfg.gdp_scenario
+
+    @property
+    def gdp_variable(self) -> str:
+        return self.cfg.gdp_variable
+
+    @property
+    def dq_demand(self) -> DataQualityProfile:
+        return self.cfg.dq_demand
+
+    @property
+    def dq_limit_tech_input(self) -> DataQualityProfile:
+        return self.cfg.dq_limit_tech_input
 
 
-def schema_file_for(cfg: Config) -> Path:
+def load_runtime_industry(
+    db_path: str | Path | None = None,
+    config_path: str | Path | None = None,
+) -> CANOEIndustryRuntime:
     paths = project_paths()
-    # if cfg.schema_version != 31:
-    #     return paths["schema"] / f"schema_{cfg.schema_version}.sql"
-    return paths["schema"] / "canoe_dataset_schema.sql"
+    if config_path is None:
+        config_path = paths["root"] / "canoe_industry.toml"
+    cfg = CANOEIndustryConfig.validate_from_toml(config_path)
 
+    if db_path is None:
+        db_path = paths["root"] / cfg.db_dir / cfg.db_name
+    db_path = Path(db_path)
+    if not db_path.exists():
+        raise FileNotFoundError(
+            f"Database not found at {db_path}. "
+            "canoe-base must create the database before this module runs."
+        )
+    logger.info("Opened existing DB at %s", db_path)
 
-def prepare_database(db_path: Path, schema_sql: str) -> list[str]:
-    ensure_dir(db_path.parent)
-    if db_path.exists():
-        db_path.unlink()
-        logger.info("Removed existing DB: %s", db_path)
-
-    with sqlite3.connect(db_path) as conn:
-        conn.executescript(schema_sql)
-        tables = [r[0] for r in conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table';"
-        ).fetchall()]
-    logger.info("Prepared new DB with %d tables", len(tables))
-    return tables
-
-
-def create_empty_comb_dict(db_path: Path, tables: list[str]) -> Dict[str, pd.DataFrame]:
-    comb_dict: Dict[str, pd.DataFrame] = {}
-    with sqlite3.connect(db_path) as conn:
-        for table in tables:
-            cols = conn.execute(f"PRAGMA table_info('{table}');").fetchall()
-            col_names = [c[1] for c in cols]
-            comb_dict[table] = pd.DataFrame(columns=col_names)
-    return comb_dict
-
-
-def load_runtime_industry(temp_db_name: str = "CAN_industry.sqlite") -> tuple[Path, Config, list[str], Dict[str, pd.DataFrame]]:
-    paths = project_paths()
-    params = load_yaml(paths["input"] / "params.yaml")
-    cfg = Config(params)
-
-    # Domain constants (from your original setup)
-    sector_abv = "I_"
-    sector_list = ['CON', 'PULP', 'SMELT', 'REFINING', 'CEMENT', 'CHEM', 'STEEL', 'OTH_MAN', 'FOR', 'MINING']
-    sector_list_ex = ['Construction', 'Pulp and paper', 'Smelting', 'Petroleum refining', 'Cement', 'Chemical', 'Iron and Steel', 'Other manufacturing', 'Forestry', 'Mining and Oil & Gas extraction']
-    province_list = ['AB', 'ON', 'BC', 'MB', 'SK', 'QC', 'PEI', 'NB', 'NS', 'NLLAB']
-    commodity_list = ['elc', 'ng', 'dsl', 'hfo', 'pcoke', 'ngl', 'coal', 'coke', 'wood', 'oth']
-    commodity_list_ex = ['Electricity', 'Natural Gas', 'Diesel', 'Heavy Fuel Oil', 'Petroleum Coke', 'Natural Gas Liquids', 'Coal', 'Coke', 'Wood', 'Other']
-    atl_pro = ['PEI', 'NB', 'NS', 'NLLAB']
-
-    # Build IDs
-    id_dict: dict[str, str] = {p: f"INDHR{p}{cfg.version}" for p in province_list}
-    id_dict['CAN'] = f"INDHR{cfg.version}"
-
-    db_path = paths["outputs"] / temp_db_name
-    # schema_sql = schema_file_for(cfg).read_text(encoding="utf-8")
-    schema_sql = get_sql_schema(cfg.schema_version)
-    tables = prepare_database(db_path, schema_sql)
-    comb_dict = create_empty_comb_dict(db_path, tables)
-
-    # embed domain/meta for downstream modules
-    comb_dict["__domain__"] = {
-        "sector": "Industry",
-        "sector_abv": sector_abv,
-        "sector_list": sector_list,
-        "sector_list_ex": sector_list_ex,
-        "province_list": province_list,
-        "commodity_list": commodity_list,
-        "commodity_list_ex": commodity_list_ex,
-        "atl_pro": atl_pro,
-        "periods": cfg.periods,
-    }
-    comb_dict["__ids__"] = id_dict
-    comb_dict["__version__"] = cfg.version
-
-    # Mapping used across modules (from your original)
-    comb_dict["__canoe_dem_to_sec__"] = {
-        "D_CON": "Construction",
-        "D_PULP": "Pulp and paper manufacturing",
-        "D_SMELT": "Aluminum and non-ferrous metal manufacturing",
-        "D_REFINING": "Refined petroleum products manufacturing",
-        "D_CEMENT": "Cement manufacturing",
-        "D_CHEM": "Chemicals manufacturing",
-        "D_STEEL": " Iron and steel manufacturing",
-        "D_OTH_MAN": "All other manufacturing",
-        "D_FOR": "Forestry, logging and support activities",
-        "D_MINING": "Total mining and oil and gas extraction",
-    }
-
-    return db_path, cfg, tables, comb_dict
+    return CANOEIndustryRuntime(cfg=cfg, db_path=db_path)

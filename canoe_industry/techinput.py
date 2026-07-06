@@ -1,54 +1,51 @@
 # -*- coding: utf-8 -*-
 """
-Created on Fri Aug 15 14:12:38 2025
+Industry: LimitTechInputSplitAnnual + Efficiency builder
 
-@author: david
+efficiency.py has been merged into this module: for each LimitTechInputSplitAnnual
+row produced, a corresponding Efficiency row is emitted in the same loop, avoiding
+a second pass over the data.
 """
 from __future__ import annotations
-import pandas as pd
-from typing import Dict
-from canoe_industry.common import setup_logging, data_year
-from canoe_schema.v3_2.models import LimitTechInputSplitAnnual
+import sqlite3
+from canoe_industry.common import setup_logging, data_year, ATL_MAP
+from canoe_industry.setup import CANOEIndustryRuntime
+from canoe_schema.v4_0.models import Efficiency, LimitTechInputSplitAnnual
 
 logger = setup_logging()
 
-SECTOR_TABLE_MAP = {
-    'CON': 3, 'PULP': 4, 'SMELT': 5, 'REFINING': 6, 'CEMENT': 7,
-    'CHEM': 8, 'STEEL': 9, 'OTH_MAN': 10, 'FOR': 11, 'MINING': 12
-}
 
-COM_TO_COL = {
-    'elc': 13, 'ng': 14, 'dsl': 15, 'hfo': 16, 'pcoke': 17,
-    'ngl': 18, 'coal': 19, 'coke': 20, 'wood': 21, 'oth': 22
-}
-
-ATL_MAP = { 'PEI': 'Prince Edward Island', 'NS': 'Nova Scotia', 'NB': 'New Brunswick', 'NLLAB': 'Newfoundland and Labrador' }
+def _to_output_comm(sector_abv: str, sec: str) -> str:
+    return f"{sector_abv}d_{sec.lower()}"
 
 
-def build_limit_tech_input_split_industry(
-    comb_dict: Dict[str, pd.DataFrame],
-    loaded_df: dict[str, dict[int, pd.DataFrame]],
+def build_limit_tech_and_efficiency_industry(
+    runtime: CANOEIndustryRuntime,
+    cursor: sqlite3.Cursor,
+    loaded_df: dict[str, dict[int, object]],
     atl_shares: dict[str, dict[str, float]],
-) -> Dict[str, pd.DataFrame]:
-    dom = comb_dict['__domain__']
-    ids = comb_dict['__ids__']
-    dem_map = comb_dict['__canoe_dem_to_sec__']
+) -> None:
+    province_list = runtime.province_list
+    sector_list = runtime.sector_list
+    sector_abv = runtime.sector_abv
+    periods = runtime.periods
+    atl_pro = runtime.atl_pro
+    ids = runtime.ids
+    dem_map = runtime.canoe_dem_to_sec
+    sector_table_map = runtime.sector_table_map
+    com_to_col = runtime.com_to_col
+    dq = runtime.dq_limit_tech_input
 
-    province_list = dom['province_list']
-    sector_list = dom['sector_list']
-    sector_abv = dom['sector_abv']
-    periods = dom['periods']
-    atl_pro = set(dom['atl_pro'])
+    ltisa_rows: list[LimitTechInputSplitAnnual] = []
+    eff_rows: list[Efficiency] = []
 
-    rows: list[LimitTechInputSplitAnnual] = []
     for region in province_list:
         for per in periods:
             for sec in sector_list:
-                rn = SECTOR_TABLE_MAP.get(sec)
+                rn = sector_table_map.get(sec)
                 if rn is None:
                     continue
 
-                # If ATL province, skip sectors not present in shares (presence gating)
                 if region in atl_pro:
                     sec_name = dem_map.get(f"D_{sec}")
                     if not sec_name:
@@ -58,7 +55,7 @@ def build_limit_tech_input_split_industry(
 
                 tis_vals: list[float | str] = []
                 coms: list[str] = []
-                for com, idx in COM_TO_COL.items():
+                for com, idx in com_to_col.items():
                     try:
                         value = (
                             loaded_df['ATL'][rn]['2022'][idx] if region in atl_pro
@@ -84,27 +81,29 @@ def build_limit_tech_input_split_industry(
                     excess = round(total_known - 1.0, 3)
                     min_val = min(float_vals)
                     min_idx = tis_vals.index(min_val)
-                    corrected = max(0.0, round(min_val - excess, 3))
-                    tis_vals[min_idx] = corrected
+                    tis_vals[min_idx] = max(0.0, round(min_val - excess, 3))
                     float_vals = [v for v in tis_vals if isinstance(v, float)]
                     total_known = sum(float_vals)
 
+                tech = f"{sector_abv}{sec}"
+                output_comm = _to_output_comm(sector_abv, sec)
+
                 for i, tis in enumerate(tis_vals):
                     com = coms[i]
+                    input_comm = f"I_{com}"
                     if tis != 'na':
                         final_val = float(tis)
                     else:
                         if na_count == 0:
                             continue
-                        missing_total = max(0.0, 1.0 - total_known)
-                        final_val = round(missing_total / na_count, 3)
+                        final_val = round(max(0.0, 1.0 - total_known) / na_count, 3)
 
-                    rows.append(
+                    ltisa_rows.append(
                         LimitTechInputSplitAnnual(
                             region=region,
                             period=per,
-                            input_comm=f"I_{com}",
-                            tech=f"{sector_abv}{sec}",
+                            input_comm=input_comm,
+                            tech=tech,
                             operator='ge',
                             proportion=final_val,
                             notes=(
@@ -113,19 +112,41 @@ def build_limit_tech_input_split_industry(
                                 'the remainder to 100% is evenly distributed.'
                             ),
                             data_source='I1',
-                            dq_cred=2,
-                            dq_geog=1,
-                            dq_struc=2,
-                            dq_tech=3,
-                            dq_time=3,
+                            dq_cred=dq.dq_cred,
+                            dq_geog=dq.dq_geog,
+                            dq_struc=dq.dq_struc,
+                            dq_tech=dq.dq_tech,
+                            dq_time=dq.dq_time,
                             data_id=ids[region],
                         )
                     )
 
-    df = pd.DataFrame(
-        [row.model_dump(mode='python') for row in rows],
-        columns=comb_dict['LimitTechInputSplitAnnual'].columns,
-    )
-    comb_dict['LimitTechInputSplitAnnual'] = pd.concat([comb_dict['LimitTechInputSplitAnnual'], df], ignore_index=True)
-    logger.info("LimitTechInputSplitAnnual rows: %d", len(rows))
-    return comb_dict
+                    eff_rows.append(
+                        Efficiency(
+                            region=region,
+                            input_comm=input_comm,
+                            tech=tech,
+                            vintage=per,
+                            output_comm=output_comm,
+                            efficiency=1.0,
+                            notes=(
+                                'All technologies are assumed to have arbitrary efficiency; '
+                                f'included commodities from NRCan Comp DB '
+                                f'(data year {data_year(per, periods)})'
+                            ),
+                            data_source='I1',
+                            data_id=ids[region],
+                        )
+                    )
+
+    if ltisa_rows:
+        cursor.executemany(*LimitTechInputSplitAnnual.bulk_insert_or_ignore_sql(ltisa_rows))
+        logger.info("LimitTechInputSplitAnnual rows written: %d", len(ltisa_rows))
+    else:
+        logger.warning("No LimitTechInputSplitAnnual rows were generated.")
+
+    if eff_rows:
+        cursor.executemany(*Efficiency.bulk_insert_or_ignore_sql(eff_rows))
+        logger.info("Efficiency rows written: %d", len(eff_rows))
+    else:
+        logger.warning("No Efficiency rows were generated.")

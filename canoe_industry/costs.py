@@ -4,36 +4,29 @@ Created on Fri Aug 15 12:33:38 2025
 
 @author: david
 """
+# TODO: complete CostInvest migration before uncommenting.
+# Placeholder values (0.1 M$/PJ) need to be replaced with real data.
 
 from __future__ import annotations
-import pandas as pd
-from typing import Dict
+import sqlite3
 from canoe_industry.common import setup_logging
-from canoe_schema.v3_2.models import CostInvest
+from canoe_industry.setup import CANOEIndustryRuntime
+from canoe_schema.v4_0.models import CostInvest
 
 logger = setup_logging()
 
 
-def build_cost_invest_industry(comb_dict: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
-    dom = comb_dict["__domain__"]
-    ids = comb_dict["__ids__"]
+def build_cost_invest_industry(runtime: CANOEIndustryRuntime, cursor: sqlite3.Cursor) -> None:
+    province_list = runtime.province_list
+    sector_list = runtime.sector_list
+    sector_abv = runtime.sector_abv
+    periods = runtime.periods
+    ids = runtime.ids
 
-    province_list = dom['province_list']
-    sector_list = dom['sector_list']
-    sector_abv = dom['sector_abv']
-    periods = dom['periods']
-    atl_pro = set(dom['atl_pro'])
-    dem_map = comb_dict['__canoe_dem_to_sec__']
-
-    # Optional: restrict to sectors present in ATL via shares (presence gating happens in demands/techinput too)
-    rows: list[CostInvest] = []
     first_vintage = min(periods)
+    rows: list[CostInvest] = []
     for province in province_list:
         for sec in sector_list:
-            # gate ATL regions by the StatCan shares presence if available
-            if province in atl_pro:
-                # We don't know presence here; rely on up/downstream gating. Keep a simple rule: allow all, or integrate a share check in caller.
-                pass
             rows.append(
                 CostInvest(
                     region=province,
@@ -46,10 +39,6 @@ def build_cost_invest_industry(comb_dict: Dict[str, pd.DataFrame]) -> Dict[str, 
                 )
             )
 
-    df = pd.DataFrame(
-        [row.model_dump(mode='python') for row in rows],
-        columns=comb_dict['CostInvest'].columns,
-    )
-    comb_dict['CostInvest'] = pd.concat([comb_dict['CostInvest'], df], ignore_index=True)
-    logger.info("CostInvest rows: %d", len(rows))
-    return comb_dict
+    if rows:
+        cursor.executemany(*CostInvest.bulk_insert_or_ignore_sql(rows))
+        logger.info("CostInvest rows written: %d", len(rows))
