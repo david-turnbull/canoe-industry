@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
+
+import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
-import tomllib
-from pydantic import BaseModel, ConfigDict
-from canoe_industry.common import setup_logging, project_paths
+from pydantic import BaseModel, ConfigDict, field_validator
+
+from canoe_industry.common import project_paths, setup_logging
 
 logger = setup_logging()
 
@@ -38,7 +40,7 @@ class CANOEIndustryConfig(BaseModel):
 
     schema_version: str = "4.0"
     version: str
-    db_dir: str = "outputs"
+    db_dir: Path = Path("outputs")
     db_name: str = "CAN_industry.sqlite"
     future_periods: list[int]
     province_list: list[str]  # TODO: CANOEProvince — see canoe-agriculture
@@ -65,6 +67,11 @@ class CANOEIndustryConfig(BaseModel):
         with open(config_path, "rb") as f:
             data = tomllib.load(f)
         return cls(**data)
+
+    @field_validator("db_dir")  # noqa: F821  # pyright: ignore[reportUndefinedVariable]
+    @classmethod
+    def expand_path(cls, v: Path) -> Path:
+        return v.expanduser()
 
 
 @dataclass

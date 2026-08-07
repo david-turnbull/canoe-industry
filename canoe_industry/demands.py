@@ -3,10 +3,13 @@
 Industry: Demand & ExistingCapacity builder
 """
 from __future__ import annotations
+
 import sqlite3
-from canoe_industry.common import setup_logging, data_year, ATL_MAP
-from canoe_industry.setup import CANOEIndustryRuntime
+
 from canoe_schema.v4_0.models import Demand, ExistingCapacity
+
+from canoe_industry.common import ATL_MAP, data_year, setup_logging
+from canoe_industry.setup import CANOEIndustryRuntime
 
 logger = setup_logging()
 
@@ -35,8 +38,8 @@ def _safe_loaded_value(
 ) -> float | None:
     try:
         val = loaded_df[prov][nrcan_table_idx][year][x_index]
-        if val in (None, '', '0'):
-            return 0.0 if val == '0' else None
+        if val in (None, "", "0"):
+            return 0.0 if val == "0" else None
         return float(val)
     except Exception:
         return None
@@ -63,27 +66,39 @@ def build_demand_and_capacity_industry(
     dq = runtime.dq_demand
 
     import pandas as pd
+
     gdp_df = macro_df.copy()
     end_years = [data_year(p, periods) for p in periods]
     all_gdp_years = sorted(set([nrcan_year]) | set(end_years))
-    gdp_df = gdp_df[gdp_df['Year'].isin(all_gdp_years)]
-    gdp_df = gdp_df[gdp_df['Variable'] == gdp_variable]
-    gdp_df = gdp_df[gdp_df['Scenario'] == gdp_scenario]
-    gdp_df = gdp_df.sort_values('Year').reset_index(drop=True)
+    gdp_df = gdp_df[gdp_df["Year"].isin(all_gdp_years)]
+    gdp_df = gdp_df[gdp_df["Variable"] == gdp_variable]
+    gdp_df = gdp_df[gdp_df["Scenario"] == gdp_scenario]
+    gdp_df = gdp_df.sort_values("Year").reset_index(drop=True)
 
-    gdp_base_rows = gdp_df[gdp_df['Year'] == nrcan_year]
-    gdp_base_val = float(gdp_base_rows.iloc[0]['Value']) if not gdp_base_rows.empty else None
+    gdp_base_rows = gdp_df[gdp_df["Year"] == nrcan_year]
+    gdp_base_val = (
+        float(gdp_base_rows.iloc[0]["Value"]) if not gdp_base_rows.empty else None
+    )
     if gdp_base_val is None:
-        logger.warning("GDP data missing for NRCan base year %d; scale factors default to 1.0", nrcan_year)
+        logger.warning(
+            "GDP data missing for NRCan base year %d; scale factors default to 1.0",
+            nrcan_year,
+        )
 
     gdp_dict: dict[int, float] = {
-        int(row['Year']): (float(row['Value']) / gdp_base_val if gdp_base_val else 1.0)
+        int(row["Year"]): (float(row["Value"]) / gdp_base_val if gdp_base_val else 1.0)
         for _, row in gdp_df.iterrows()
     }
 
     def _baseline_dict_for_year(year_str: str) -> dict[str, dict[str, float | None]]:
         d: dict[str, dict[str, float | None]] = {
-            'AB': {}, 'ON': {}, 'MB': {}, 'QC': {}, 'BC': {}, 'SK': {}, 'ATL': {}
+            "AB": {},
+            "ON": {},
+            "MB": {},
+            "QC": {},
+            "BC": {},
+            "SK": {},
+            "ATL": {},
         }
         for t, dem in enumerate(demand_com_list):
             x = t + 2
@@ -91,7 +106,7 @@ def build_demand_and_capacity_industry(
                 d[prov][dem] = _safe_loaded_value(loaded_df, prov, 2, year_str, x)
         return d
 
-    base_2022 = _baseline_dict_for_year('2022')
+    base_2022 = _baseline_dict_for_year("2022")
     # base_2021 = _baseline_dict_for_year('2021')  # needed when ExistingCapacity is enabled
 
     # ---- Demand rows ----
@@ -103,21 +118,21 @@ def build_demand_and_capacity_industry(
 
             for dem in demand_com_list:
                 val: float | None = None
-                notes = ''
-                ref = ''
+                notes = ""
+                ref = ""
 
-                if pro in ('AB', 'ON', 'BC', 'QC', 'MB', 'SK'):
+                if pro in ("AB", "ON", "BC", "QC", "MB", "SK"):
                     base = base_2022[pro].get(dem)
                     if base is None:
                         continue
                     val = float(base) * scale
                     notes = (
-                        f'GDP-scaled from NRCan 2022 baseline to data year {dy} '
-                        'using CER CEF Global Net-zero GDP growth'
+                        f"GDP-scaled from NRCan 2022 baseline to data year {dy} "
+                        "using CER CEF Global Net-zero GDP growth"
                     )
-                    ref = 'I2'
+                    ref = "I2"
                 elif pro in atl_pro:
-                    temp_val = base_2022['ATL'].get(dem)
+                    temp_val = base_2022["ATL"].get(dem)
                     if temp_val in (None, 0.0):
                         continue
                     share = _get_atl_share(pro, dem, atl_shares, dem_to_sec)
@@ -125,14 +140,14 @@ def build_demand_and_capacity_industry(
                         continue
                     val = float(temp_val) * share * scale
                     notes = (
-                        f'GDP-scaled from NRCan 2022 ATL baseline to data year {dy} '
-                        'using CER CEF Global Net-zero GDP growth and StatCan regional shares'
+                        f"GDP-scaled from NRCan 2022 ATL baseline to data year {dy} "
+                        "using CER CEF Global Net-zero GDP growth and StatCan regional shares"
                     )
-                    ref = 'I4'
+                    ref = "I4"
 
-                if val in (None, ''):
+                if val in (None, ""):
                     continue
-                if val == '0':
+                if val == "0":
                     val = 0.0
 
                 dem_rows.append(
@@ -141,7 +156,7 @@ def build_demand_and_capacity_industry(
                         period=int(year),
                         commodity=sector_abv + dem.lower(),
                         demand=float(val),
-                        units='PJ',
+                        units="PJ",
                         notes=notes,
                         data_source=ref,
                         dq_cred=dq.dq_cred,
