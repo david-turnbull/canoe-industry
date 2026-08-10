@@ -2,7 +2,7 @@
 # Python 3.11+ tomllib reads this file (no extra dependency required).
 
 schema_version = "4.0"
-version        = "002"
+version        = "003"
 db_dir         = "~/OneDrive/dev/canoe-data/master-db"
 db_name        = "canoe-v4-master.sqlite"
 nrcan_year     = 2022
