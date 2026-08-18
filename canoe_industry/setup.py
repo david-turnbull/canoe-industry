@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
+from canoe_schema.v4_0.models import CommodityTypeCode
 from pydantic import BaseModel, ConfigDict, field_validator
 
 from canoe_industry.common import project_paths, setup_logging
@@ -17,6 +18,7 @@ class CANOEInputFuel(BaseModel):
     shortname: str
     longname: str
     nrcan_col_idx: int
+    commodity_type: CommodityTypeCode = CommodityTypeCode.A
 
 
 class CANOEIndustrySector(BaseModel):
@@ -90,6 +92,7 @@ class CANOEIndustryRuntime:
     sector_list_ex: list[str] = field(init=False)
     commodity_list: list[str] = field(init=False)
     commodity_list_ex: list[str] = field(init=False)
+    commodity_list_type: list[str] = field(init=False)
     demand_com_list: list[str] = field(init=False)
     sector_table_map: dict[str, int] = field(init=False)
     com_to_col: dict[str, int] = field(init=False)
@@ -101,6 +104,7 @@ class CANOEIndustryRuntime:
         self.ids["CAN"] = f"INDHR{fv}"
         self.sector_list = [s.shortname for s in self.cfg.sectors]
         self.sector_list_ex = [s.longname for s in self.cfg.sectors]
+        self.commodity_list_type = [f"{f.commodity_type}" for f in self.cfg.input_fuels]
         self.commodity_list = [f.shortname for f in self.cfg.input_fuels]
         self.commodity_list_ex = [f.longname for f in self.cfg.input_fuels]
         self.demand_com_list = [f"D_{s.shortname}" for s in self.cfg.sectors]

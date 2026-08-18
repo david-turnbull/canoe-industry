@@ -40,6 +40,7 @@ dq_time  = 3
 shortname     = "elc"
 longname      = "Electricity"
 nrcan_col_idx = 13
+commodity_type = "p"
 
 [[input_fuels]]
 shortname     = "ng"

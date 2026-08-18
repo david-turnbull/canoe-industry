@@ -19,6 +19,7 @@ def build_technology_and_commodity_industry(runtime: CANOEIndustryRuntime, curso
     sector_list_ex = runtime.sector_list_ex
     commodity_list = runtime.commodity_list
     commodity_list_ex = runtime.commodity_list_ex
+    commodity_list_type = runtime.commodity_list_type
     ids = runtime.ids
 
     tech_rows = [
@@ -51,7 +52,7 @@ def build_technology_and_commodity_industry(runtime: CANOEIndustryRuntime, curso
             flag = "d"
             desc = f"Demand for the {desc_list[i]} sector"
         else:
-            flag = "a"
+            flag = commodity_list_type[i]
             desc = f"Represents {desc_list[i]} in the industrial sector"
         comm_rows.append(Commodity(name=code, flag=flag, description=desc, data_id=ids['CAN']))
 
