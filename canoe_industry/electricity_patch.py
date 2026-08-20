@@ -2,66 +2,79 @@
 from __future__ import annotations
 
 from sqlite3 import Cursor
+import sqlite3
 from typing import Dict
 
 import pandas as pd
 from loguru import logger
 
-from canoe_industry.common import CANOEIndustryConfig
+from canoe_industry.common import setup_logging
 from canoe_schema.v4_0.models import Efficiency, LifetimeTech, Technology
 
+from canoe_industry.setup import CANOEIndustryRuntime
 
-def add_electricity_bridge(
-    module_config: CANOEAgricultureConfig,
-    db_cursor: Cursor,
-    comb_dict: Dict[str, pd.DataFrame],
+logger = setup_logging()
+
+def add_electricity_bridge_industry(
+    runtime: CANOEIndustryRuntime,
+    cursor: sqlite3.Cursor,
 ) -> None:
-    """Add the electricity-to-agriculture transfer pathway.
+    """Add the electricity-to-industry transfer pathway.
 
     Creates:
-        E_elc_dem -> E_A_ELC -> A_elc
+        E_elc_dem -> E_I_elc -> I_elc
 
-    The agriculture end-use technology then consumes A_elc through the normal
-    techinput logic:
-        A_elc -> A_AGRI -> A_d_agri
+    The normal industry end-use technologies then consume I_elc through
+    techinput.py, for example:
+
+        I_elc -> I_<industry subsector> -> I_d_<industry subsector>
     """
-    ids = comb_dict["__ids__"]
 
-    sector = module_config.sector_initial.upper()
-    transfer_tech = f"E_{sector}_ELC"
+    transfer_tech = "E_I_elc"
     input_comm = "E_elc_dem"
-    output_comm = f"{sector}_elc"
+    output_comm = "I_elc"
 
-    configured_fuels = {fuel.shortname.lower() for fuel in module_config.input_fuels}
+    # techinput.py builds I_<commodity> inputs from runtime.com_to_col.
+    # Only create the bridge if electricity is part of the configured
+    # industry fuel/commodity mapping.
+    configured_fuels = {
+        str(commodity).lower()
+        for commodity in runtime.com_to_col.keys()
+    }
+
     if "elc" not in configured_fuels:
         logger.warning(
-            "Electricity bridge skipped because 'elc' is not configured in input_fuels."
+            "Electricity bridge skipped because 'elc' is not present "
+            "in runtime.com_to_col."
         )
         return
 
-    # Technology is global/national in the sector dataset, matching the way
-    # the rest of the agriculture technology scaffolding is registered.
-    tech_row = Technology(
-        tech=transfer_tech,
-        flag="p",
-        sector="agriculture",
-        unlim_cap=1,
-        annual=0,
-        description="Electricity transfer from the electricity sector to agriculture",
-        data_id=ids["CAN"],
-    )
-    db_cursor.executemany(*Technology.bulk_insert_or_ignore_sql([tech_row]))
-
+    technology_rows: list[Technology] = []
     efficiency_rows: list[Efficiency] = []
     lifetime_rows: list[LifetimeTech] = []
 
-    for region in module_config.province_list:
-        if region == "CAN":
-            continue
+    for region in runtime.province_list:
+        data_id = runtime.ids[region]
 
-        data_id = ids[region]
+        # Technology is repeated by data_id so that each regional industry
+        # dataset contains the transfer technology when data_id is part of
+        # the table key.
+        technology_rows.append(
+            Technology(
+                tech=transfer_tech,
+                flag="p",
+                sector="industry",
+                unlim_cap=1,
+                annual=0,
+                description=(
+                    "Electricity transfer from the electricity sector "
+                    "to the industry sector"
+                ),
+                data_id=data_id,
+            )
+        )
 
-        for vintage in module_config.future_periods:
+        for vintage in runtime.periods:
             efficiency_rows.append(
                 Efficiency(
                     region=region,
@@ -70,7 +83,7 @@ def add_electricity_bridge(
                     vintage=vintage,
                     output_comm=output_comm,
                     efficiency=1.0,
-                    notes="Arbitrary value for electricity transfer technology",
+                    notes="Arbitrary efficiency for electricity transfer technology",
                     data_id=data_id,
                 )
             )
@@ -81,26 +94,32 @@ def add_electricity_bridge(
                 tech=transfer_tech,
                 lifetime=5,
                 notes=(
-                    "Arbitrary lifetime so the electricity transfer technology "
-                    "is renewed as often as needed"
+                    "Arbitrary five-year lifetime so the electricity transfer "
+                    "technology is renewed as often as needed"
                 ),
                 data_id=data_id,
             )
         )
 
+    if technology_rows:
+        cursor.executemany(
+            *Technology.bulk_insert_or_ignore_sql(technology_rows)
+        )
+
     if efficiency_rows:
-        db_cursor.executemany(
+        cursor.executemany(
             *Efficiency.bulk_insert_or_ignore_sql(efficiency_rows)
         )
 
     if lifetime_rows:
-        db_cursor.executemany(
+        cursor.executemany(
             *LifetimeTech.bulk_insert_or_ignore_sql(lifetime_rows)
         )
 
     logger.info(
-        "Electricity bridge {}: Technology=1, Efficiency={}, LifetimeTech={}",
+        "Electricity bridge %s: Technology=%d, Efficiency=%d, LifetimeTech=%d",
         transfer_tech,
+        len(technology_rows),
         len(efficiency_rows),
         len(lifetime_rows),
     )

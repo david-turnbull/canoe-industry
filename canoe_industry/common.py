@@ -1,120 +1,65 @@
 # -*- coding: utf-8 -*-
+"""
+Created on Fri Sep 26 09:02:13 2025
+
+@author: david
+"""
+
 from __future__ import annotations
+import logging
+from pathlib import Path
 
-import sqlite3
+LOGGER_NAME = "industry_etl"
 
-from canoe_industry.common import setup_logging
-from canoe_industry.setup import CANOEIndustryRuntime
-from canoe_schema.v4_0.models import Efficiency, LifetimeTech, Technology
+# TODO (Step 5): move into CANOEIndustryConfig / a shared canoe-common package
+ATL_MAP: dict[str, str] = {
+    'PEI': 'Prince Edward Island',
+    'NB': 'New Brunswick',
+    'NS': 'Nova Scotia',
+    'NLLAB': 'Newfoundland and Labrador',
+}
 
-logger = setup_logging()
+
+def setup_logging(level: int = logging.INFO) -> logging.Logger:
+    logger = logging.getLogger(LOGGER_NAME)
+    if not logger.handlers:
+        logger.setLevel(level)
+        handler = logging.StreamHandler()
+        fmt = logging.Formatter(
+            "%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+        handler.setFormatter(fmt)
+        logger.addHandler(handler)
+    return logger
 
 
-def add_electricity_bridge_industry(
-    runtime: CANOEIndustryRuntime,
-    cursor: sqlite3.Cursor,
-) -> None:
-    """Add the electricity-to-industry transfer pathway.
 
-    Creates:
-        E_elc_dem -> E_I_elc -> I_elc
+def ensure_dir(path: Path) -> Path:
+    path.mkdir(parents=True, exist_ok=True)
+    return path
 
-    The normal industry end-use technologies then consume I_elc through
-    techinput.py, for example:
 
-        I_elc -> I_<industry subsector> -> I_d_<industry subsector>
-    """
-
-    transfer_tech = "E_I_elc"
-    input_comm = "E_elc_dem"
-    output_comm = "I_elc"
-
-    # techinput.py builds I_<commodity> inputs from runtime.com_to_col.
-    # Only create the bridge if electricity is part of the configured
-    # industry fuel/commodity mapping.
-    configured_fuels = {
-        str(commodity).lower()
-        for commodity in runtime.com_to_col.keys()
+def project_paths() -> dict[str, Path]:
+    root = Path.cwd()
+    return {
+        "root": root,
+        "input": root / "input",
+        "outputs": root / "outputs",
+        "cache": root / "cache",
+        "schema": root / "schema",
     }
 
-    if "elc" not in configured_fuels:
-        logger.warning(
-            "Electricity bridge skipped because 'elc' is not present "
-            "in runtime.com_to_col."
-        )
-        return
 
-    technology_rows: list[Technology] = []
-    efficiency_rows: list[Efficiency] = []
-    lifetime_rows: list[LifetimeTech] = []
+def data_year(period_or_vintage: int, model_periods: list[int]) -> int:
+    """Return the representative data year for a model period/vintage.
 
-    for region in runtime.province_list:
-        data_id = runtime.ids[region]
+    End-of-period convention: each model period uses data from the end of that
+    period, i.e. period + 5 years (uniform 5-year step).
 
-        # Technology is repeated by data_id so that each regional industry
-        # dataset contains the transfer technology when data_id is part of
-        # the table key.
-        technology_rows.append(
-            Technology(
-                tech=transfer_tech,
-                flag="p",
-                sector="industry",
-                unlim_cap=1,
-                annual=0,
-                description=(
-                    "Electricity transfer from the electricity sector "
-                    "to the industry sector"
-                ),
-                data_id=data_id,
-            )
-        )
-
-        for vintage in runtime.periods:
-            efficiency_rows.append(
-                Efficiency(
-                    region=region,
-                    input_comm=input_comm,
-                    tech=transfer_tech,
-                    vintage=vintage,
-                    output_comm=output_comm,
-                    efficiency=1.0,
-                    notes="Arbitrary efficiency for electricity transfer technology",
-                    data_id=data_id,
-                )
-            )
-
-        lifetime_rows.append(
-            LifetimeTech(
-                region=region,
-                tech=transfer_tech,
-                lifetime=5,
-                notes=(
-                    "Arbitrary five-year lifetime so the electricity transfer "
-                    "technology is renewed as often as needed"
-                ),
-                data_id=data_id,
-            )
-        )
-
-    if technology_rows:
-        cursor.executemany(
-            *Technology.bulk_insert_or_ignore_sql(technology_rows)
-        )
-
-    if efficiency_rows:
-        cursor.executemany(
-            *Efficiency.bulk_insert_or_ignore_sql(efficiency_rows)
-        )
-
-    if lifetime_rows:
-        cursor.executemany(
-            *LifetimeTech.bulk_insert_or_ignore_sql(lifetime_rows)
-        )
-
-    logger.info(
-        "Electricity bridge %s: Technology=%d, Efficiency=%d, LifetimeTech=%d",
-        transfer_tech,
-        len(technology_rows),
-        len(efficiency_rows),
-        len(lifetime_rows),
-    )
+    Pre-existing vintages (before the first model period) use same-year data.
+    """
+    if period_or_vintage < model_periods[0]:
+        return period_or_vintage
+    else:
+        return period_or_vintage + 5
