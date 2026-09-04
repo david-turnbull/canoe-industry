@@ -1,0 +1,164 @@
+# CANOE Industry module configuration
+# Python 3.11+ tomllib reads this file (no extra dependency required).
+
+schema_version = "4.0"
+version        = "003"
+db_dir         = "~/OneDrive/dev/canoe-data/master-db"
+db_name        = "canoe-v4-master.sqlite"
+nrcan_year     = 2022
+gdp_scenario   = "Global Net-zero"
+gdp_variable   = "Real Gross Domestic Product ($2012 Millions)"
+validation_behavior = "error"
+
+future_periods = [2025, 2030, 2035, 2040, 2045]
+
+province_list  = ["AB", "ON", "BC", "MB", "SK", "QC", "PEI", "NB", "NS", "NLLAB"]
+
+# Provinces whose demands are split from the NRCan ATL aggregate via StatCan shares
+atl_provinces  = ["PEI", "NB", "NS", "NLLAB"]
+
+# ── Data-quality profiles ────────────────────────────────────────────────────
+
+[dq_demand]
+dq_cred  = 1
+dq_geog  = 1
+dq_struc = 2
+dq_tech  = 3
+dq_time  = 2
+
+[dq_limit_tech_input]
+dq_cred  = 2
+dq_geog  = 1
+dq_struc = 2
+dq_tech  = 3
+dq_time  = 3
+
+# ── Input fuels ──────────────────────────────────────────────────────────────
+# nrcan_col_idx: 1-indexed column in NRCan comprehensive DB sector tables
+
+[[input_fuels]]
+shortname     = "elc"
+longname      = "Electricity"
+nrcan_col_idx = 13
+commodity_type = "p"
+
+[[input_fuels]]
+shortname     = "ng"
+longname      = "Natural Gas"
+nrcan_col_idx = 14
+
+[[input_fuels]]
+shortname     = "dsl"
+longname      = "Diesel"
+nrcan_col_idx = 15
+
+[[input_fuels]]
+shortname     = "hfo"
+longname      = "Heavy Fuel Oil"
+nrcan_col_idx = 16
+
+[[input_fuels]]
+shortname     = "pcoke"
+longname      = "Petroleum Coke"
+nrcan_col_idx = 17
+
+[[input_fuels]]
+shortname     = "ngl"
+longname      = "Natural Gas Liquids"
+nrcan_col_idx = 18
+
+[[input_fuels]]
+shortname     = "coal"
+longname      = "Coal"
+nrcan_col_idx = 19
+
+[[input_fuels]]
+shortname     = "coke"
+longname      = "Coke"
+nrcan_col_idx = 20
+
+[[input_fuels]]
+shortname     = "wood"
+longname      = "Wood"
+nrcan_col_idx = 21
+
+[[input_fuels]]
+shortname     = "oth"
+longname      = "Other"
+nrcan_col_idx = 22
+
+# ── Industry sectors ─────────────────────────────────────────────────────────
+# statcan_sector_name must match the exact string used as a key in
+# StatCan table 25-10-0029-01 (including any leading/trailing whitespace).
+
+[[sectors]]
+shortname           = "CON"
+longname            = "Construction"
+nrcan_table_idx     = 3
+canoe_dem_key       = "D_CON"
+statcan_sector_name = "Construction"
+
+[[sectors]]
+shortname           = "PULP"
+longname            = "Pulp and paper"
+nrcan_table_idx     = 4
+canoe_dem_key       = "D_PULP"
+statcan_sector_name = "Pulp and paper manufacturing"
+
+[[sectors]]
+shortname           = "SMELT"
+longname            = "Smelting"
+nrcan_table_idx     = 5
+canoe_dem_key       = "D_SMELT"
+statcan_sector_name = "Aluminum and non-ferrous metal manufacturing"
+
+[[sectors]]
+shortname           = "REFINING"
+longname            = "Petroleum refining"
+nrcan_table_idx     = 6
+canoe_dem_key       = "D_REFINING"
+statcan_sector_name = "Refined petroleum products manufacturing"
+
+[[sectors]]
+shortname           = "CEMENT"
+longname            = "Cement"
+nrcan_table_idx     = 7
+canoe_dem_key       = "D_CEMENT"
+statcan_sector_name = "Cement manufacturing"
+
+[[sectors]]
+shortname           = "CHEM"
+longname            = "Chemical"
+nrcan_table_idx     = 8
+canoe_dem_key       = "D_CHEM"
+statcan_sector_name = "Chemicals manufacturing"
+
+[[sectors]]
+# Leading space in statcan_sector_name is intentional —
+# it matches the raw string in StatCan table 25-10-0029-01.
+shortname           = "STEEL"
+longname            = "Iron and Steel"
+nrcan_table_idx     = 9
+canoe_dem_key       = "D_STEEL"
+statcan_sector_name = " Iron and steel manufacturing"
+
+[[sectors]]
+shortname           = "OTH_MAN"
+longname            = "Other manufacturing"
+nrcan_table_idx     = 10
+canoe_dem_key       = "D_OTH_MAN"
+statcan_sector_name = "All other manufacturing"
+
+[[sectors]]
+shortname           = "FOR"
+longname            = "Forestry"
+nrcan_table_idx     = 11
+canoe_dem_key       = "D_FOR"
+statcan_sector_name = "Forestry, logging and support activities"
+
+[[sectors]]
+shortname           = "MINING"
+longname            = "Mining and Oil & Gas extraction"
+nrcan_table_idx     = 12
+canoe_dem_key       = "D_MINING"
+statcan_sector_name = "Total mining and oil and gas extraction"

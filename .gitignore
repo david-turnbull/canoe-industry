@@ -2,3 +2,5 @@ outputs/*
 __pycache__/*
 *.pyc
 *settings.json
+.vscode/
+uv.lock
